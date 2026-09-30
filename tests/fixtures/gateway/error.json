@@ -1,0 +1,6 @@
+{
+  "_type": "error",
+  "_message": {
+    "error": "some error string"
+  }
+}

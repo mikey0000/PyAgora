@@ -1,0 +1,17 @@
+{
+  "payload": {"cmd": "start_live", "payload": {"isSD": 0}},
+  "path": "/dev/v2/project/app-id-test/rtm/users/app_123456/peer_messages",
+  "query": "?wait_for_ack=true",
+  "headers": {
+    "Content-Type": "application/json",
+    "x-agora-token": "TOKEN_REDACTED",
+    "x-agora-uid": "app_123456",
+    "Authorization": "agora token=TOKEN_REDACTED"
+  },
+  "body": {
+    "destination": "dev_654321",
+    "enable_offline_messaging": false,
+    "enable_historical_messaging": false,
+    "payload": "{\"cmd\":\"start_live\",\"payload\":{\"isSD\":0}}"
+  }
+}

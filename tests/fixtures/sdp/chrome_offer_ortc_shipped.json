@@ -1,0 +1,308 @@
+{
+  "iceParameters": {
+    "iceUfrag": "nNCO",
+    "icePwd": "ICEPWD_REDACTED_24chars0"
+  },
+  "dtlsParameters": {
+    "fingerprints": [
+      {
+        "hashFunction": "sha-256",
+        "fingerprint": "69:56:A4:D2:A9:FD:9B:E5:09:63:1F:A1:96:59:04:28:E3:67:42:B2:CC:9C:26:79:15:FD:3C:0D:52:6F:7F:88"
+      }
+    ],
+    "role": "server"
+  },
+  "rtpCapabilities": {
+    "send": {
+      "audioCodecs": [],
+      "audioExtensions": [],
+      "videoCodecs": [],
+      "videoExtensions": []
+    },
+    "recv": {
+      "audioCodecs": [],
+      "audioExtensions": [],
+      "videoCodecs": [
+        {
+          "payloadType": 49,
+          "rtpMap": {
+            "encodingName": "H265",
+            "clockRate": 90000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "nack",
+              "parameter": "pli"
+            },
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {
+              "level-id": "93",
+              "profile-id": "1",
+              "tier-flag": "0",
+              "tx-mode": "SRST"
+            }
+          }
+        }
+      ],
+      "videoExtensions": []
+    },
+    "sendrecv": {
+      "audioCodecs": [
+        {
+          "payloadType": 111,
+          "rtpMap": {
+            "encodingName": "opus",
+            "clockRate": 48000,
+            "encodingParameters": 2
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "transport-cc"
+            },
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {
+              "minptime": "10",
+              "useinbandfec": "1"
+            }
+          }
+        },
+        {
+          "payloadType": 63,
+          "rtpMap": {
+            "encodingName": "red",
+            "clockRate": 48000,
+            "encodingParameters": 2
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {
+              "111/111": null
+            }
+          }
+        },
+        {
+          "payloadType": 9,
+          "rtpMap": {
+            "encodingName": "G722",
+            "clockRate": 8000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 0,
+          "rtpMap": {
+            "encodingName": "PCMU",
+            "clockRate": 8000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 8,
+          "rtpMap": {
+            "encodingName": "PCMA",
+            "clockRate": 8000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 13,
+          "rtpMap": {
+            "encodingName": "CN",
+            "clockRate": 8000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 110,
+          "rtpMap": {
+            "encodingName": "telephone-event",
+            "clockRate": 48000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 126,
+          "rtpMap": {
+            "encodingName": "telephone-event",
+            "clockRate": 8000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        }
+      ],
+      "audioExtensions": [
+        {
+          "entry": 1,
+          "extensionName": "urn:ietf:params:rtp-hdrext:ssrc-audio-level"
+        },
+        {
+          "entry": 2,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
+        },
+        {
+          "entry": 3,
+          "extensionName": "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
+        },
+        {
+          "entry": 4,
+          "extensionName": "urn:ietf:params:rtp-hdrext:sdes:mid"
+        }
+      ],
+      "videoCodecs": [
+        {
+          "payloadType": 96,
+          "rtpMap": {
+            "encodingName": "VP8",
+            "clockRate": 90000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "goog-remb"
+            },
+            {
+              "type": "transport-cc"
+            },
+            {
+              "type": "ccm",
+              "parameter": "fir"
+            },
+            {
+              "type": "nack"
+            },
+            {
+              "type": "nack",
+              "parameter": "pli"
+            },
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {}
+          }
+        },
+        {
+          "payloadType": 97,
+          "rtpMap": {
+            "encodingName": "rtx",
+            "clockRate": 90000
+          },
+          "rtcpFeedbacks": [
+            {
+              "type": "rrtr"
+            }
+          ],
+          "fmtp": {
+            "parameters": {
+              "apt": "96"
+            }
+          }
+        }
+      ],
+      "videoExtensions": [
+        {
+          "entry": 14,
+          "extensionName": "urn:ietf:params:rtp-hdrext:toffset"
+        },
+        {
+          "entry": 2,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
+        },
+        {
+          "entry": 13,
+          "extensionName": "urn:3gpp:video-orientation"
+        },
+        {
+          "entry": 3,
+          "extensionName": "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
+        },
+        {
+          "entry": 5,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay"
+        },
+        {
+          "entry": 6,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/video-content-type"
+        },
+        {
+          "entry": 7,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/video-timing"
+        },
+        {
+          "entry": 8,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/color-space"
+        },
+        {
+          "entry": 4,
+          "extensionName": "urn:ietf:params:rtp-hdrext:sdes:mid"
+        },
+        {
+          "entry": 10,
+          "extensionName": "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"
+        },
+        {
+          "entry": 11,
+          "extensionName": "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"
+        },
+        {
+          "entry": 12,
+          "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/abs-capture-time"
+        }
+      ]
+    }
+  },
+  "version": "2"
+}

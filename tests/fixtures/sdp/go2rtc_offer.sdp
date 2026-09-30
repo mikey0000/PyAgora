@@ -1,0 +1,45 @@
+v=0
+o=- 4215775240449105457 1727712000 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=fingerprint:sha-256 0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A:0F:3A
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=video 9 UDP/TLS/RTP/SAVPF 102 103
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:0
+a=ice-ufrag:PionUfragTest
+a=ice-pwd:not-a-real-ice-password
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:102 H264/90000
+a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
+a=rtcp-fb:102 goog-remb
+a=rtcp-fb:102 ccm fir
+a=rtcp-fb:102 nack
+a=rtcp-fb:102 nack pli
+a=rtpmap:103 rtx/90000
+a=fmtp:103 apt=102
+a=extmap:1 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=recvonly
+a=candidate:1390596646 1 udp 2130706431 192.0.2.20 50000 typ host
+a=candidate:1390596646 2 udp 2130706431 192.0.2.20 50000 typ host
+a=candidate:2786424364 1 udp 1694498815 198.51.100.20 50000 typ srflx raddr 0.0.0.0 rport 50000
+a=candidate:2786424364 2 udp 1694498815 198.51.100.20 50000 typ srflx raddr 0.0.0.0 rport 50000
+a=end-of-candidates
+m=audio 9 UDP/TLS/RTP/SAVPF 111 0 8
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:1
+a=ice-ufrag:PionUfragTest
+a=ice-pwd:not-a-real-ice-password
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:111 opus/48000/2
+a=fmtp:111 minptime=10;useinbandfec=1
+a=rtcp-fb:111 transport-cc
+a=rtpmap:0 PCMU/8000
+a=rtpmap:8 PCMA/8000
+a=extmap:1 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=recvonly

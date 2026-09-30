@@ -1,0 +1,8 @@
+{
+  "_type": "on_notification",
+  "_message": {
+    "action": "quit",
+    "code": 2003,
+    "detail": "ERR_REPEAT_JOIN"
+  }
+}

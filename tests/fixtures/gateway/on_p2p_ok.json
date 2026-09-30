@@ -1,0 +1,7 @@
+{
+  "_type": "on_p2p_ok",
+  "_message": {
+    "uid": 123456,
+    "proxy": false
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "_id": "c3d4e5",
+  "_type": "unsubscribe",
+  "_message": {
+    "p2p_id": 1,
+    "ortc": [],
+    "stream_id": 1
+  }
+}

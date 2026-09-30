@@ -1,0 +1,11 @@
+{
+  "_type": "on_rtp_capability_change",
+  "_message": {
+    "video_codec": [
+      "vp8",
+      "h264"
+    ],
+    "extmap_allow_mixed": true,
+    "web_av1_svc": false
+  }
+}

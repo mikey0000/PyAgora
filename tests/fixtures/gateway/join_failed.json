@@ -1,0 +1,8 @@
+{
+  "_id": "a1b2c3",
+  "_result": "failed",
+  "_message": {
+    "error_code": 2003,
+    "error_str": "ERR_REPEAT_JOIN_CHANNEL"
+  }
+}

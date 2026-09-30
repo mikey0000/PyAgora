@@ -1,0 +1,56 @@
+{
+  "enter_ts": 1790716795180,
+  "opid": 999972753885,
+  "detail": {},
+  "response_body": [
+    {
+      "uri": 23,
+      "buffer": {
+        "code": 2,
+        "flag": 4096,
+        "uid": 12345678,
+        "cid": 123456789,
+        "cname": "IOT_ID_REDACTED",
+        "cert": "TICKET_REDACTED",
+        "detail": {
+          "1": "UNI_LBS_IP",
+          "8": "VID",
+          "19": "FP_A;FP_B;FP_C",
+          "23": "EU",
+          "502": "CS_IP",
+          "candidate": "203.0.113.10:4707"
+        },
+        "edges_services": []
+      }
+    },
+    {
+      "uri": 23,
+      "buffer": {
+        "code": 0,
+        "flag": 4194310,
+        "uid": 12345678,
+        "cid": 987654321,
+        "cname": "IOT_ID_REDACTED",
+        "cert": "TURN_TICKET_REDACTED",
+        "detail": {
+          "8": "TURN_USER_REDACTED",
+          "4": "TURN_CRED_REDACTED"
+        },
+        "edges_services": [
+          {
+            "ip": "198.51.100.20",
+            "port": 443
+          },
+          {
+            "ip": "198.51.100.21",
+            "port": 443
+          },
+          {
+            "ip": "198.51.100.22",
+            "port": 443
+          }
+        ]
+      }
+    }
+  ]
+}

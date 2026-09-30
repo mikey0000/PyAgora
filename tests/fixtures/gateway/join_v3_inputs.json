@@ -1,0 +1,79 @@
+{
+  "request_id": "a1b2c3",
+  "session_id": "session-test",
+  "process_id": "process-test",
+  "client_ts_ms": 1790716795300,
+  "ortc": {
+    "iceParameters": {
+      "iceUfrag": "nNCO",
+      "icePwd": "ice-pwd-offer-test-00001",
+      "candidates": []
+    },
+    "dtlsParameters": {
+      "fingerprints": [
+        {
+          "hashFunction": "sha-256",
+          "fingerprint": "69:56:A4"
+        }
+      ],
+      "role": "server"
+    },
+    "rtpCapabilities": {
+      "send": {
+        "audioCodecs": [],
+        "audioExtensions": [],
+        "videoCodecs": [],
+        "videoExtensions": []
+      },
+      "recv": {
+        "audioCodecs": [],
+        "audioExtensions": [],
+        "videoCodecs": [],
+        "videoExtensions": []
+      },
+      "sendrecv": {
+        "audioCodecs": [],
+        "audioExtensions": [],
+        "videoCodecs": [
+          {
+            "payloadType": 96,
+            "rtpMap": {
+              "encodingName": "VP8",
+              "clockRate": 90000
+            },
+            "rtcpFeedbacks": [
+              {
+                "type": "nack"
+              },
+              {
+                "type": "rrtr"
+              }
+            ],
+            "fmtp": {
+              "parameters": {}
+            }
+          }
+        ],
+        "videoExtensions": [
+          {
+            "entry": 4,
+            "extensionName": "urn:ietf:params:rtp-hdrext:sdes:mid"
+          }
+        ]
+      }
+    },
+    "version": "2"
+  },
+  "ap_response": {
+    "code": 0,
+    "server_ts": 1790716795180,
+    "uid": 123456,
+    "cid": 123456789,
+    "cname": "channel-test",
+    "detail": {},
+    "flag": 4096,
+    "opid": 999972753885,
+    "cert": "ticket-test",
+    "ticket": "ticket-test"
+  }
+}

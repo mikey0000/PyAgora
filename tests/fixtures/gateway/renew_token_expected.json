@@ -1,0 +1,7 @@
+{
+  "_id": "a7b8c9",
+  "_type": "renew_token",
+  "_message": {
+    "token": "rtc-token-not-real"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "_type": "on_user_offline",
+  "_message": {
+    "uid": 1,
+    "reason": "quit"
+  }
+}

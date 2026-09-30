@@ -441,7 +441,7 @@ class AgoraWebSocketHandler:
             _LOGGER.info("Stored rejoin_token: %s...", self._rejoin_token[:20])
 
         # Send set_client_role after successful connection
-        await self._send_set_client_role(role="host", level=0)
+        # await self._send_set_client_role(role="host", level=0)
 
         if not ortc:
             _LOGGER.error("No ORTC parameters in join success response")

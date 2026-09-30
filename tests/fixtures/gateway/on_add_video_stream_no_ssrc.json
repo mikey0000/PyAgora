@@ -1,0 +1,7 @@
+{
+  "_type": "on_add_video_stream",
+  "_message": {
+    "uid": 1,
+    "video": true
+  }
+}

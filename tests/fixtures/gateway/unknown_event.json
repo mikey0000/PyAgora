@@ -1,0 +1,11 @@
+{
+  "_type": "on_published_user_list",
+  "_message": {
+    "users": [
+      {
+        "uid": 1
+      }
+    ]
+  },
+  "_extra": 1
+}

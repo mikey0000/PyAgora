@@ -1,0 +1,44 @@
+{
+  "opid": 999972753885,
+  "detail": {
+    "23": "GLOBAL",
+    "38": "CROSS_REGION"
+  },
+  "response_body": [
+    {
+      "uri": 23,
+      "buffer": {
+        "code": 0,
+        "flag": 4096,
+        "uid": 12345678,
+        "cid": 123456789,
+        "cname": "IOT_ID_REDACTED",
+        "cert": "TICKET_REDACTED",
+        "detail": {
+          "1": "UNI_LBS_IP",
+          "8": "VID",
+          "19": "FP_A;FP_B;FP_C;FP_D",
+          "23": "EU",
+          "502": "CS_IP",
+          "candidate": "203.0.113.10:4707"
+        },
+        "edges_services": [
+          {
+            "ip": "203.0.113.10",
+            "port": 4713
+          },
+          {
+            "port": 4713
+          },
+          {
+            "ip": "203.0.113.12"
+          },
+          {
+            "ip": "203.0.113.13",
+            "port": 4713
+          }
+        ]
+      }
+    }
+  ]
+}

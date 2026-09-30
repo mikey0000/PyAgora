@@ -1,0 +1,6 @@
+{
+  "_type": "on_user_online",
+  "_message": {
+    "uid": 1
+  }
+}

@@ -1,12 +1,140 @@
 [project]
 name = "pyagora"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Async Python client for Agora RTC signalling: edge discovery, SDP/ORTC negotiation and the WebSocket gateway session"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
+authors = [{ name = "Michael Arthur" }]
+keywords = ["agora", "webrtc", "rtc", "sdp", "ortc", "asyncio", "camera"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Typing :: Typed",
+]
 dependencies = [
-    "aiohttp>=3.13.3",
-    "ruff>=0.15.7",
+    "aiohttp>=3.10",
+    "websockets>=13.1",
     "sdp-transform>=1.1.0",
-    "websockets>=16.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mikey0000/PyAgora"
+Documentation = "https://github.com/mikey0000/PyAgora/tree/main/docs"
+
+[dependency-groups]
+dev = [
+    "packaging>=24.0",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "time-machine>=2.16",
+    "ty>=0.0.1a8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pyagora"]
+
+[tool.ruff]
+required-version = ">=0.8"
+line-length = 120
+target-version = "py313"
+exclude = [".venv", ".claude", "docs/analysis/legacy"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "CPY001",  # no copyright headers
+    "D203",    # conflicts with D211
+    "D213",    # conflicts with D212
+    "E501",    # formatter owns line length
+    "COM812",  # conflicts with formatter
+    "ISC001",  # conflicts with formatter
+    "TRY003",  # exception messages are built at the raise site (exceptions.py owns the types)
+    "PLR2004", # magic-value rule fires on protocol constants that are named by context
+    "FIX002",  # TODOs are allowed when they cite a backlog entry
+    "TD002",   # no author on TODOs
+    "TD003",   # backlog entries, not issue links
+    "D105",    # magic methods are self-describing
+    "D106",    # nested Config classes are plumbing
+    "D107",    # __init__ is documented by the class docstring
+    "EM101",   # exception text is assembled at the raise site
+    "EM102",
+]
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert is the test primitive
+    "S105",    # fixture "secrets" are obviously fake
+    "S106",
+    "S107",
+    "D",       # docstrings only where the constitution asks (regression tests)
+    "ANN401",  # fakes take Any where the real protocol does
+    "SLF001",  # a unit test may inspect its own module's privates
+    "PLR0913", # fixtures fan in
+    "ARG",     # fakes accept the protocol's parameters and ignore some
+    "INP001",
+    "FBT001",  # parametrised boolean cases are the point of the test
+    "PT018",   # a compound assert on one recorded call reads as one fact
+]
+"tests/fakegateway/**" = [
+    "C901",    # a validating fake has branchy handlers by nature
+    "PLR0911",
+    "PLR0912",
+    "TRY301",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+combine-as-imports = true
+known-first-party = ["pyagora", "tests"]
+
+[tool.ruff.lint.flake8-type-checking]
+strict = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ty.src]
+include = ["pyagora"]
+exclude = ["tests/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "regression: pins a bug that escaped; seen red before the fix (docs/testing.md §7)",
+    "live: talks to real Agora infrastructure; needs PYAGORA_LIVE_* credentials",
+]
+addopts = "-m 'not live' --strict-markers -ra"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["pyagora"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "\\.\\.\\.$",
 ]

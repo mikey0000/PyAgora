@@ -1,0 +1,9 @@
+{
+  "_id": "e5f6a7",
+  "_type": "set_client_role",
+  "_message": {
+    "role": "host",
+    "level": 0,
+    "client_ts": 1790716796000
+  }
+}

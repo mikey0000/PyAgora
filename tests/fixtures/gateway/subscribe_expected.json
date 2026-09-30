@@ -1,0 +1,15 @@
+{
+  "_id": "b2c3d4",
+  "_type": "subscribe",
+  "_message": {
+    "stream_id": 1,
+    "stream_type": "video",
+    "mode": "live",
+    "codec": "vp8",
+    "p2p_id": 1,
+    "twcc": true,
+    "rtx": false,
+    "extend": "",
+    "ssrcId": 44444444
+  }
+}

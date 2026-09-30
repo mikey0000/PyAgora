@@ -1,0 +1,31 @@
+{
+  "enter_ts": 1790716855180,
+  "opid": 999972753886,
+  "detail": {},
+  "response_body": [
+    {
+      "uri": 29,
+      "buffer": {
+        "code": 0,
+        "flag": 4096,
+        "uid": 12345678,
+        "cid": 123456789,
+        "cname": "IOT_ID_REDACTED",
+        "cert": "TICKET_UPDATED_REDACTED",
+        "detail": {
+          "19": "FP_A;FP_B"
+        },
+        "edges_services": [
+          {
+            "ip": "203.0.113.10",
+            "port": 4713
+          },
+          {
+            "ip": "203.0.113.11",
+            "port": 4713
+          }
+        ]
+      }
+    }
+  ]
+}

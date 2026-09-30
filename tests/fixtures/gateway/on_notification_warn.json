@@ -1,0 +1,7 @@
+{
+  "_type": "on_notification",
+  "_message": {
+    "action": "warn",
+    "code": 1
+  }
+}

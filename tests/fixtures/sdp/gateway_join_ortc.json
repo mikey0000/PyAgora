@@ -1,0 +1,22 @@
+{
+  "cname": "o/i14u9pJrxRKAsu",
+  "iceParameters": {
+    "iceUfrag": "KdDV",
+    "icePwd": "ICEPWD_REDACTED_24chars1",
+    "candidates": [
+      {"foundation": "udpcandidate", "ip": "198.51.100.13", "port": 4707, "priority": 2103266323, "protocol": "udp", "type": "host"}
+    ]
+  },
+  "dtlsParameters": {
+    "role": "client",
+    "fingerprints": [{"algorithm": "sha-256", "fingerprint": "BD:3E:08"}]
+  },
+  "rtpCapabilities": {
+    "sendrecv": {
+      "audioCodecs": [{"payloadType": 111, "rtpMap": {"encodingName": "opus", "clockRate": 48000}}],
+      "videoCodecs": [{"payloadType": 102, "rtpMap": {"encodingName": "H264", "clockRate": 90000}}],
+      "audioExtensions": [],
+      "videoExtensions": []
+    }
+  }
+}

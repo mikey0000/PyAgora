@@ -1,0 +1,9 @@
+{
+  "_type": "on_p2p_lost",
+  "error_code": 7,
+  "error_str": "top-level copy",
+  "_message": {
+    "error_code": 1,
+    "error_str": "stun timeout"
+  }
+}
