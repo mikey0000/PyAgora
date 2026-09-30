@@ -130,9 +130,12 @@ PetKit's copy never depended on the event: it subscribed on
 PetKit gateway sends it. The risk is real for PetKit's usual order: RTM
 `start_live` goes out just before the join, so the camera likely starts
 publishing after we joined, and that stream is subscribed only if
-`on_user_online` also arrives. Today: gated. Closes with a PetKit session at
-DEBUG, checked as migration §4 describes; if the gate holds a stream, a
-`SessionOptions.subscribe_requires_online` option relaxes it (backlog).
+`on_user_online` also arrives. Today: gated by default;
+`SessionOptions.subscribe_requires_online=False` drops the gate and PetKit
+passes it (D28). Closes with a default-mode PetKit session at DEBUG, checked
+as migration §4 describes: a `Holding stream … from uid … until
+on_user_online` line with no subscribe after it is the gate holding the
+stream. The answer decides the option's eventual default.
 
 ## Q19. Does the gateway ever omit `dtlsParameters.fingerprints`?
 

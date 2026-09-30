@@ -239,3 +239,14 @@ dozen characters, so a `renew_token` frame is logged whole, token included
 `pyagorartc.session.wire`, set to INFO. A host that needs the frames can set
 that logger to DEBUG on purpose; the session's own frame lines go through
 `describe_frame` and carry no values.
+
+## D28. The presence gate on subscribe is an option
+
+HA-Luba subscribed to an announced stream only once its publisher's
+`on_user_online` had been seen; PetKit subscribed on `on_add_video_stream`
+alone, and its camera likely starts publishing after the join, so the gate
+could hold its stream forever. `SessionOptions.subscribe_requires_online`
+defaults to `True`, preserving the Mammotion rule; PetKit passes `False`,
+which counts the announced uid as present so `on_user_offline` still tears
+the subscription down. A held stream logs its uid at DEBUG. Q18 decides the
+eventual default.

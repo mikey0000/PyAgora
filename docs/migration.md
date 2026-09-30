@@ -531,7 +531,7 @@ Verified against `homeassistant_petkit` (manifest `1.27.0`) and `pypetkitapi`
 | `webrtc_common._add_offer_candidates` (unused) | `extract_inline_candidates(offer_sdp)` |
 | `webrtc_common._resolve_agora_user_id` (unused) | the uid fallback in §3.2 |
 | fingerprint merge from the AP (`agora_websocket.py:357-391`) | inside the session, only when the gateway sends none (D26) |
-| subscribe on announcement, the join-payload walk, the retry loop (`agora_websocket.py:440-472`, `555-646`) | inside the session. `existing_streams_from_join` is PetKit's walk; retries are ack-driven and a post-join stream waits for `on_user_online` (§3.6, Q18) |
+| subscribe on announcement, the join-payload walk, the retry loop (`agora_websocket.py:440-472`, `555-646`) | inside the session. `existing_streams_from_join` is PetKit's walk; retries are ack-driven; `subscribe_requires_online=False` subscribes a post-join stream on its announcement, as PetKit did (§3.4, D28) |
 | `agora_rtm.AgoraRTMSignaling._send_command`, `_iter_endpoints`, `_ensure_session`, `SIGNALING_DOMAINS`, `SIGNALING_PATHS`, `SUCCESS_CODES` | `pyagorartc.rtm.RtmRestClient.send_peer_message` (D18) |
 | `AgoraRTMSignaling.start_live`, `_heartbeat_loop`, `stop_live`, `send_ptz_ctrl`, `update_tokens`, `STOP_SUCCESS_CODES` | stays (PetKit vocabulary, D18); rebuilt on `RtmRestClient` (§3.5) |
 | `whep_proxy.PetkitAgoraUpstreamManager._refresh_tokens` (`whep_proxy.py:289-296`) | stays; the 20-minute RTM token loop (§3.5) |
@@ -648,7 +648,7 @@ async def _refresh_agora_context(self, creds: ChannelCredentials) -> APResponse:
 
 `PetkitAgoraUpstreamManager` keeps one upstream per device and already closes
 the previous one first (`whep_proxy.py:129`). Every option PetKit passes
-(`whep_proxy.py:154-162`) has a `SessionOptions` field; two more keep old
+(`whep_proxy.py:154-162`) has a `SessionOptions` field; three more keep old
 behaviour the library turned off by default:
 
 | `AgoraWebSocketHandler` argument | `SessionOptions` |
@@ -661,6 +661,7 @@ behaviour the library turned off by default:
 | hard-coded `codec: "h264"` (`agora_websocket.py:679`, `:553`) | `client_codec="h264"` |
 | unconditional `set_client_role(host, 0)` (`agora_websocket.py:354`) | `send_set_client_role=True` (D6, Q3) |
 | `p2p_lost` disconnects (`agora_websocket.py:414-422`) | `end_on_p2p_lost=True` (D22, Q13) |
+| subscribe on `on_add_video_stream` alone (`agora_websocket.py:440-470`) | `subscribe_requires_online=False` (D28, Q18) |
 | `rtc_token_provider=` | the `token_provider=` argument |
 | `on_connection_lost=` | the `on_closed=` argument |
 
@@ -676,6 +677,7 @@ PETKIT_OPTIONS = SessionOptions(
     disable_audio=True,
     send_set_client_role=True,        # until Q3 is answered on real hardware
     end_on_p2p_lost=True,             # PetKit ended the session on p2p_lost (D22)
+    subscribe_requires_online=False,  # the camera may publish with no on_user_online (D28, Q18)
 )
 
 
@@ -888,7 +890,7 @@ class AgoraRTMSignaling:
 |---|---|---|---|
 | MID header extension stripped from the answer | every gateway extension the offer also has is echoed, MID included (`agora_websocket.py:950-963`) | D16, Q7 | **The change most likely to alter behaviour.** pion then routes RTP by SSRC alone: fine while the answer declares the stream's SSRC. When no stream is announced within 15 s the answer has no `a=ssrc` and, now, no MID either. If go2rtc logs unhandled SSRCs or shows no video, pass `strip_mid_extension=False` (PetKit's bytes) and report it under Q7. |
 | Candidates in the join ORTC are the offer's inline ones, unfiltered | the offer's candidates, filtered to srflx/prflx/Agora-TURN relays (`whep_proxy.py:163-173`, `camera.py:654-671`) | D11 | go2rtc's host candidates now reach the gateway. The gateway is ice-lite, so they should be inert. To restore the filter, strip the `a=candidate:` lines from the offer and `add_ice_candidate` each of `filter_candidates(extract_inline_candidates(offer), turn_ips)` before `join` (backlog). |
-| A stream announced after the join is subscribed only once `on_user_online` for its publisher is seen | subscribe on `on_add_video_stream` alone; `on_user_online` only recorded a uid nothing read (`agora_websocket.py:433-470`) | Q18 | Watch for `remote_streams` non-empty while `remote_users` lacks that uid and `on_stream` never fires. Streams in the join payload are unaffected. |
+| An announced stream's publisher counts as present in `remote_users` | subscribe on `on_add_video_stream` alone; `on_user_online` only recorded a uid nothing read (`agora_websocket.py:433-470`) | D28, Q18 | Nothing expected with `subscribe_requires_online=False`: the stream is subscribed on its announcement, as before, and `on_user_offline` still unsubscribes it. |
 | Subscribe retries only while unacknowledged | 1 s after the answer, re-sent every known stream 3 times regardless of ack (`agora_websocket.py:616-646`) | D1 | Nothing expected; a gateway that never acks gets the same 4 sends. |
 | Answer `a=setup` mirrors the gateway's DTLS role | always `active` (`agora_websocket.py:945`) | D5 | Identical when the gateway says `client` or `auto`. If a PetKit gateway ever answers `server`, the answer now says `passive` and go2rtc must be the DTLS client; a DTLS stall there is this. |
 | ORTC DTLS role `server` | `client` (`agora_sdp.py:167`) | D4 | `ortc_dtls_role="client"` restores the old bytes if DTLS stalls (Q2). |
@@ -988,7 +990,7 @@ After:
 | Q11 renew debounce | yes | yes | Enable debug logging for `pyagorartc` (in `loggers` on both hosts, §2.6, §3.7), leave a session running past token expiry, and count `renew_token` sends and any gateway error after repeats. `SessionOptions(renew_debounce_s=...)` changes the 30 s window. On PetKit each renewal is also a live-feed fetch. |
 | Q13 `on_p2p_lost` for a subscriber | — (ignored, D22) | yes | `PETKIT_OPTIONS` ends the session on it. Log the frame's `code`/`error` (the library's WARNING carries both) whenever it fires, noting whether video had actually stopped. Frames during a healthy stream → try `end_on_p2p_lost=False`. |
 | Q14 RTM ack shapes | — | yes | `pyagorartc.rtm` at DEBUG logs `status`, `result` and `code` for every `start_live`, `live_heartbeat`, `stop_live` and `ptz_ctrl`. One of each, plus a `stop_live` to an idle camera (expected `message_offline`), closes it. |
-| Q18 subscribe gate | — (the gate is HA-Luba's rule, protocol §3.2) | yes | After the answer, log `session.remote_users`, `session.remote_streams` and whether `on_stream` fired. A stream in `remote_streams` whose uid is not in `remote_users`, with no `on_stream`, is the gate holding a subscribe: the PetKit gateway does not send `on_user_online` for it. Then the backlog's `subscribe_requires_online=False` is needed. |
+| Q18 subscribe gate | — (the gate is HA-Luba's rule, protocol §3.2) | yes | `PETKIT_OPTIONS` passes `subscribe_requires_online=False` (D28). To answer Q18, run one session with the default (`True`) and `pyagorartc` at DEBUG: a `Holding stream … from uid … until on_user_online` line with no subscribe after it means the PetKit gateway sends no `on_user_online` for that stream, and PetKit keeps `False`. A subscribe that follows the line means it does, and the gate is safe for PetKit. |
 
 Report each result as a new decision in `decisions.md` that closes the
 question.

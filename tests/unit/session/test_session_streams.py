@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import pytest
 
@@ -86,6 +87,19 @@ class TestStreamAnnouncements:
 
         assert len(r.subscribes()) == 1
 
+    async def test_logs_the_held_publisher_at_debug(self, caplog: pytest.LogCaptureFixture) -> None:
+        r = rig()
+        await r.join("join_ok_rtx")
+
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.session.session"):
+            r.conn.feed(load_json_fixture("gateway/on_add_video_stream.json"))
+            await r.mark()
+
+        # A host diagnoses Q18 from this line: the stream is known, its publisher's presence is not.
+        (held,) = [rec for rec in caplog.records if "on_user_online" in rec.getMessage()]
+        assert held.levelno == logging.DEBUG
+        assert f"uid {PUBLISHER}" in held.getMessage()
+
     async def test_ignores_streams_from_uids_other_than_the_target(self) -> None:
         r = rig(SessionOptions(target_uid=OTHER_PUBLISHER))
         await r.join("join_ok_rtx")
@@ -129,6 +143,62 @@ class TestStreamAnnouncements:
 
         assert r.subscribes() == []
         assert r.session.is_joined
+
+
+class TestSubscribeWithoutPresence:
+    """``subscribe_requires_online=False``: the announcement alone is enough (D28, PetKit)."""
+
+    async def test_subscribes_to_a_stream_whose_publisher_never_came_online(self) -> None:
+        r = rig(SessionOptions(subscribe_requires_online=False))
+        await r.join("join_ok_rtx")
+
+        r.conn.feed(load_json_fixture("gateway/on_add_video_stream.json"))
+
+        (frame,) = await r.sent_type("subscribe")
+        assert (frame["_message"]["stream_id"], frame["_message"]["ssrcId"]) == (PUBLISHER, STREAM_SSRC)
+
+    async def test_counts_the_announced_publisher_as_present(self) -> None:
+        r = rig(SessionOptions(subscribe_requires_online=False))
+        await r.join("join_ok_rtx")
+
+        r.conn.feed(load_json_fixture("gateway/on_add_video_stream.json"))
+        await r.sent_type("subscribe")
+
+        assert PUBLISHER in r.session.remote_users
+
+    async def test_a_later_on_user_online_does_not_subscribe_again(self) -> None:
+        r = rig(SessionOptions(subscribe_requires_online=False))
+        await r.join("join_ok_rtx")
+        r.conn.feed(load_json_fixture("gateway/on_add_video_stream.json"))
+        await r.sent_type("subscribe")
+
+        r.conn.feed(load_json_fixture("gateway/on_user_online.json"))
+        await r.mark()
+
+        assert len(r.subscribes()) == 1
+
+    async def test_unsubscribes_and_forgets_the_publisher_when_it_goes_offline(self) -> None:
+        r = rig(SessionOptions(subscribe_requires_online=False))
+        await r.join("join_ok_rtx")
+        r.conn.feed(load_json_fixture("gateway/on_add_video_stream.json"))
+        await r.sent_type("subscribe")
+
+        r.conn.feed(load_json_fixture("gateway/on_user_offline.json"))
+
+        (frame,) = await r.sent_type("unsubscribe")
+        assert frame["_message"]["stream_id"] == PUBLISHER
+        assert PUBLISHER not in r.session.remote_users
+        assert r.session.remote_streams == ()
+
+    async def test_still_ignores_a_stream_from_another_uid_than_the_target(self) -> None:
+        r = rig(SessionOptions(subscribe_requires_online=False, target_uid=OTHER_PUBLISHER))
+        await r.join("join_ok_rtx")
+
+        r.conn.feed(event("on_add_video_stream", uid=PUBLISHER))
+        await r.mark(OTHER_PUBLISHER)
+
+        assert r.subscribes(PUBLISHER) == []
+        assert PUBLISHER not in r.session.remote_users
 
 
 class TestSubscribeRetry:

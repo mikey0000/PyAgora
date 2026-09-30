@@ -77,7 +77,9 @@ host: s = AgoraSession(creds, ap, options, callbacks…)
            (JoinRejectedError / JoinTimeoutError; never a fabricated SDP)
         4. subscribe to streams already in the join payload, and to each
            announced stream once both on_add_video_stream and
-           on_user_online for its publisher have been seen (any order),
+           on_user_online for its publisher have been seen (any order;
+           a held stream logs its uid at DEBUG, Q18) — or on the
+           announcement alone with subscribe_requires_online=False (D28),
            filtered by target_uid and never our own uid; each subscribe
            task calls on_stream(stream) once, after its first subscribe
         5. start owned tasks: ping, keepalive (if given); every timer
@@ -145,6 +147,7 @@ new `AgoraSession`. That is what keeps state simple enough to reason about.
 | `set_client_role` after join | `SessionOptions.send_set_client_role` (default off) | knowing the device tolerates it |
 | Join codec and flags | `client_codec` (default `vp8`, D7), `prealloc_pc` (default on, Q10), `extra_join_attributes` (merged into `userAttributes` last; stored read-only) | the codec its device publishes; any flag it needs |
 | DTLS role in the client ORTC | `ortc_dtls_role` (default `server`; `None` sends none, D4/Q2) | a parity experiment |
+| Subscribing before presence | `subscribe_requires_online` (default on, D28/Q18) | whether its gateway sends `on_user_online` for a publisher |
 | Ending on `on_p2p_lost` | `end_on_p2p_lost` (default off, D22) | whether its device treats it as fatal |
 | Renewal cadence | `renew_debounce_s` (default 30 s, D8/Q11) | nothing, unless the gateway penalises repeats |
 | Timeouts | `join_timeout_s` (15 s), `connect_timeout_s` (10 s) | a slower network |

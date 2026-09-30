@@ -197,8 +197,9 @@ class SessionOptions:
     ``extra_join_attributes`` merges into the join's ``userAttributes`` last; it is stored read-only and left
     out of the hash, so the options stay hashable. ``end_on_p2p_lost``
     is off because the Mammotion integration deliberately ignored ``on_p2p_lost`` (D22);
-    PetKit ends the session on it. ``prealloc_pc`` and ``renew_debounce_s`` exist so a host can
-    answer Q10 and Q11 without patching.
+    PetKit ends the session on it. ``subscribe_requires_online`` holds an announced stream until its
+    publisher's ``on_user_online`` (Q18, D28); PetKit passes ``False``. ``prealloc_pc`` and
+    ``renew_debounce_s`` exist so a host can answer Q10 and Q11 without patching.
     """
 
     client_codec: str = DEFAULT_CLIENT_CODEC
@@ -210,6 +211,7 @@ class SessionOptions:
     disable_audio: bool = False
     subscribe_retry_attempts: int = 0
     subscribe_retry_delay_s: float = 0.0
+    subscribe_requires_online: bool = True
     strip_mid_extension: bool = True
     prealloc_pc: bool = True
     end_on_p2p_lost: bool = False

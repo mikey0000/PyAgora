@@ -121,6 +121,7 @@ class TestSessionOptions:
         assert options.verify_ssl is True
         assert options.end_on_p2p_lost is False
         assert options.prealloc_pc is True
+        assert options.subscribe_requires_online is True
         assert options.renew_debounce_s == 30.0
 
     def test_defaults_come_from_const(self) -> None:

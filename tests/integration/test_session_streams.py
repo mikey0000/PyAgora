@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from pyagorartc.const import PEER_REJOIN_DEBOUNCE_S
 from pyagorartc.models import RemoteStream, SessionOptions
-from tests.fakegateway._common import DEVICE_SSRC, DEVICE_UID
+from tests.fakegateway._common import DEVICE_SSRC, DEVICE_UID, event
 from tests.integration._helpers import SESSION_TIMEOUT_S
 from tests.unit._fakes import Recorder
 
@@ -55,6 +55,50 @@ class TestSubscribe:
 
         (frame,) = await r.received("subscribe")
         assert frame["_message"]["stream_id"] == DEVICE_UID
+
+    async def test_subscribes_once_when_the_stream_precedes_on_user_online_without_the_presence_gate(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        fake_agora.control(device_online=False, peer_online=False)
+        r = new_session(SessionOptions(subscribe_requires_online=False))
+        await r.join()
+
+        await fake_agora.announce_peer(stream_first=True)
+        await fake_agora.send_token_will_expire()
+        # The renew is spawned after any second subscribe on_user_online would have spawned.
+        await r.received("renew_token")
+
+        (frame,) = fake_agora.state.log.received_of_type("subscribe")
+        assert frame["_message"]["stream_id"] == DEVICE_UID
+
+    async def test_holds_a_stream_whose_publisher_never_comes_online_by_default(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        fake_agora.control(device_online=False, peer_online=False)
+        r = new_session()
+        await r.join()
+        fake_agora.control(device_online=True)
+
+        await fake_agora.gateway.broadcast(event("on_add_video_stream", fake_agora.state.device.video_stream()))
+        await fake_agora.send_token_will_expire()
+        await r.received("renew_token")
+
+        assert fake_agora.state.log.received_of_type("subscribe") == []
+        assert [s.uid for s in r.session.remote_streams] == [DEVICE_UID]
+
+    async def test_subscribes_to_a_stream_whose_publisher_never_comes_online_with_the_option(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        fake_agora.control(device_online=False, peer_online=False)
+        r = new_session(SessionOptions(subscribe_requires_online=False))
+        await r.join()
+        fake_agora.control(device_online=True)
+
+        await fake_agora.gateway.broadcast(event("on_add_video_stream", fake_agora.state.device.video_stream()))
+
+        (frame,) = await r.received("subscribe")
+        assert frame["_message"]["stream_id"] == DEVICE_UID
+        assert r.session.remote_users == frozenset({DEVICE_UID})
 
     async def test_reports_the_stream_to_the_host(self, new_session: Callable[..., SessionRig]) -> None:
         on_stream = Recorder()

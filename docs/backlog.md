@@ -19,11 +19,6 @@ Open work only; finished items are deleted.
   coverage.
 - A fake gateway knob that omits `dtlsParameters.fingerprints` from the join
   response, so D26's fill-in gets integration coverage (Q19).
-- `SessionOptions.subscribe_requires_online: bool = True` (Q18): `False`
-  subscribes on `on_add_video_stream` alone, as PetKit's copy did
-  (`agora_websocket.py:440-470`). Add it before PetKit ships if its gateway
-  sends no `on_user_online`; with it, a DEBUG line when a stream is held for
-  presence, since today `_maybe_subscribe` returns silently.
 - A way for a host to filter the join's inline candidates. PetKit dropped
   host candidates before the join (`whep_proxy.py:170-173`); `join()` now
   sends every `a=candidate:` in the offer. The workaround (strip the lines,
@@ -52,8 +47,8 @@ Open work only; finished items are deleted.
 - pymammotion drops its unused `sdp-transform`, `websockets`, `webrtc-models`
   requirements.
 - PetKit: migration per `docs/migration.md` §3. One go2rtc session per
-  camera model at DEBUG answers Q18 first (it decides whether
-  `subscribe_requires_online` is needed before release), then Q3, Q7 and
+  camera model at DEBUG answers Q18 first (it decides the default of
+  `subscribe_requires_online`, D28), then Q3, Q7 and
   Q13 (migration §4). `send_set_client_role` and `end_on_p2p_lost` stay on
   for PetKit until those runs say otherwise.
 

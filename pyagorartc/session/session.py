@@ -407,6 +407,9 @@ class AgoraSession:
                 self._options.target_uid,
             )
             return
+        if not self._options.subscribe_requires_online:
+            # D28: the announcement stands in for presence, so a later on_user_offline still tears it down.
+            self._online.add(stream.uid)
         self._announce(stream)
         self._maybe_subscribe(stream)
 
@@ -516,7 +519,10 @@ class AgoraSession:
     def _maybe_subscribe(self, stream: RemoteStream) -> None:
         # Subscribe once both the stream and its publisher are known; they arrive in either order (protocol.md §3.2).
         key = (stream.uid, stream.ssrc)
-        if not self.is_joined or key in self._subscriptions or stream.uid not in self._online:
+        if not self.is_joined or key in self._subscriptions:
+            return
+        if stream.uid not in self._online:
+            _LOGGER.debug("Holding stream %s from uid %s until on_user_online (Q18)", stream.ssrc, stream.uid)
             return
         self._subscriptions[key] = self._spawn(self._subscribe(stream))
 
