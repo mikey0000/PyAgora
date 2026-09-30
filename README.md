@@ -125,4 +125,4 @@ session reports its end once, through `on_closed(CloseReason)` (D14).
 
 ## Licence
 
-MIT. See [`LICENSE`](LICENSE).
+GPL-3.0-or-later. See [`LICENSE`](LICENSE).

@@ -3,7 +3,7 @@ name = "pyagora"
 version = "0.2.0"
 description = "Async Python client for Agora RTC signalling: edge discovery, SDP/ORTC negotiation and the WebSocket gateway session"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.13"
 authors = [{ name = "Michael Arthur" }]
 keywords = ["agora", "webrtc", "rtc", "sdp", "ortc", "asyncio", "camera"]
