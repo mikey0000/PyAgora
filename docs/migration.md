@@ -8,7 +8,7 @@ The hosts today:
 
 | Host | Local Agora code | Entry points |
 |---|---|---|
-| Mammotion (`HA-Luba/custom_components/mammotion/`) | `agora_api.py`, `agora_sdp.py`, `agora_websocket.py` | `camera.py`, `coordinator.py::async_check_stream_expiry` |
+| Mammotion (`HA-Luba/custom_components/mammotion/`) | none since the `pyagorartc-migration` branch (§2) | `camera.py`, `stream_session.py`, `coordinator.py::async_check_stream_expiry` |
 | PetKit (`homeassistant_petkit/custom_components/petkit/`) | `agora_api.py`, `agora_sdp.py`, `agora_websocket.py`, `agora_rtm.py`, parts of `webrtc_common.py` and `whep_proxy.py` | `whep_proxy.py::PetkitAgoraUpstreamManager`, `camera.py` |
 
 Names below are the target API (`docs/analysis/divergence.md` §6, with
@@ -167,9 +167,24 @@ hosts drop their pins and let HA's constraint decide.
 | `_handle_join_success` fingerprint injection from `agora_response.addresses` | inside the session, only when the gateway sends none (D26) |
 | fallback SDP generator | deleted (D9) |
 | `camera.py`: `_fpv_keepalive`, `_recover_stream`, `_async_session_ended`, `get_ice_servers`, teardown, services | stays (host glue); signatures adapt below |
-| `coordinator.py::async_check_stream_expiry` (token cache, all-camera fallback, 50504) | stays; its AP block shrinks (§2.3) |
-| `RTCIceServer` conversion | stays in the host (§1.2) |
-| `tests_ha/test_agora_*.py`, `test_fpv_keepalive.py` | ported to the library's test tree (backlog); delete from HA-Luba with the modules |
+| `coordinator.py::async_check_stream_expiry` (token cache, all-camera fallback, 50504) | stays; its AP block shrinks to one `async_choose_server` call (§2.3) |
+| credential mapping, AP call, `RTCIceServer` and candidate conversion | new host module `stream_session.py`: `mammotion_credentials`, `async_choose_server`, `to_rtc_ice_servers`, `to_ice_candidate` (§1.2, §1.3, §2.2, §2.3) |
+| `tests_ha/test_agora_answer_sdp.py`, `test_agora_camera_uid_filter.py`, `test_agora_peer_recovery_cap.py`, `test_agora_renew_token_debounce.py`, `test_agora_session_quit.py`, `test_fpv_keepalive.py` | deleted from the host; the library covers them (below) |
+
+The six deleted host tests and where the library pins the same behaviour:
+
+| Deleted host test | Library test |
+|---|---|
+| `test_agora_answer_sdp.py` | `tests/unit/sdp/test_answer.py` |
+| `test_agora_camera_uid_filter.py` | `tests/unit/session/test_session_recovery.py` (`target_uid`) |
+| `test_agora_peer_recovery_cap.py` | `tests/unit/session/test_recovery.py`, `test_session_recovery.py` |
+| `test_agora_renew_token_debounce.py` | `tests/unit/session/test_session_timers.py` |
+| `test_agora_session_quit.py` | `tests/unit/session/test_session.py` (`GATEWAY_QUIT`) |
+| `test_fpv_keepalive.py` | `tests/unit/session/test_session_timers.py` |
+
+The host keeps its own tests for the glue: `tests_ha/test_camera_agora_session.py` and
+`test_stream_session.py`, on a hand-written `AgoraSession` stand-in in
+`tests_ha/agora_session_support.py`.
 
 ### 2.2 Credentials
 
@@ -187,6 +202,8 @@ maps to `ChannelCredentials` (D2):
 | `availableTime` | not a credential: `deadline=` on the session (D2, D15) |
 | `cameras[]` | not used: the camera is `SessionOptions.target_uid` = slot + 1 (D2) |
 | `areaCode` | leave at the default `"CN,GLOBAL"` for now; see below |
+
+Put this in `stream_session.py`, with the other conversions (§2.3).
 
 ```python
 import base64
@@ -216,53 +233,119 @@ def mammotion_credentials(data: StreamSubscriptionResponse) -> ChannelCredential
 - **Encryption caveat (D20).** The library sends no `aes_*` field in the
   join (the SDK RSA-wraps the secret, Q17) and logs a WARNING when
   `encryption` is set; it cannot decrypt media either (architecture §6).
-  An encrypted channel will not show a picture. Log a warning when `openEncrypt` is non-zero, or
-  refuse the offer with a clear `WebRTCError`. Q6 asks whether any mower
-  sets it.
+  An encrypted channel will not show a picture. HA-Luba chose to warn:
+  `_new_session` logs a WARNING whenever `openEncrypt` is non-zero, and
+  the library logs its own when `key` is also set. Q6 asks whether any
+  mower sets it.
 - **Area code.** The captured `areaCode` is `AREA_CODE_EU`, an Android SDK
   enum name. Whether the Web AP accepts that form is unverified (Q12).
   Keep the default until a capture shows the mapping.
 
-### 2.3 Edge discovery and ICE servers (`coordinator.py`)
+### 2.3 Edge discovery and ICE servers (`stream_session.py`, `coordinator.py`)
 
-Replace the `AgoraAPIClient` block in `async_check_stream_expiry`:
+`stream_session.py` is the one home for the host's Agora conversions:
+`mammotion_credentials` (§2.2), `async_choose_server`, `to_rtc_ice_servers`
+(§1.2) and `to_ice_candidate` (§1.3). The coordinator and the camera import
+from it; neither builds an `AgoraAPClient` or an `RTCIceServer` itself.
 
 ```python
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from pyagorartc import AgoraAPClient, PyAgoraRTCError
+async def async_choose_server(hass: HomeAssistant, data: StreamSubscriptionResponse) -> APResponse:
+    client = AgoraAPClient(session=async_get_clientsession(hass))
+    return await client.choose_server(mammotion_credentials(data))
+```
 
+No `async with`: the session is HA's, and a borrowed session is never
+closed, so the context manager does nothing (Constitution §4).
+
+The `AgoraAPIClient` block in `async_check_stream_expiry` becomes:
+
+```python
 if stream_data is not None and stream_data.data is not None:
     try:
-        creds = mammotion_credentials(stream_data.data)
-        async with AgoraAPClient(async_get_clientsession(self.hass)) as ap_client:
-            ap = await ap_client.choose_server(creds)
+        agora_response = await async_choose_server(self.hass, stream_data.data)
     except PyAgoraRTCError:
         LOGGER.exception("Agora edge discovery failed")
         self.ice_servers = []
     else:
-        self.ice_servers = to_rtc_ice_servers(ap)
-        self._agora_response = ap
+        self.ice_servers = to_rtc_ice_servers(agora_response)
+        self._agora_response = agora_response
 ```
 
-The broad `except Exception` narrows to `PyAgoraRTCError`. The AP call is now
+`camera.async_setup_entry` converts too: it calls `async_check_stream_expiry()`
+once for the first mower and sets `to_rtc_ice_servers(agora_response)` on every
+mower's coordinator. Both call sites use the same helper.
+
+The broad `except Exception` narrows to `PyAgoraRTCError`; anything else
+reaches the token refresh's outer catch as before. The AP call is now
 TLS-verified (D10); `AgoraAPClient(..., verify_ssl=False)` exists for
 proxied networks.
 
 ### 2.4 The session (`camera.py`)
 
-The entity holds at most one session, created per offer.
+The entity holds at most one session, created per offer. This is the
+shape the branch ships (trimmed).
 
 ```python
 import time
 
 from pyagorartc import AgoraSession, APResponse, CloseReason, IceCandidate, PyAgoraRTCError, SessionOptions
 
+from .stream_session import mammotion_credentials, to_ice_candidate
+
 
 class MammotionWebRTCCamera(MammotionCameraBaseEntity):
-    _session: AgoraSession | None = None
-    _early_candidates: list[IceCandidate]  # initialised to [] in __init__
+    def __init__(self, ...) -> None:
+        ...
+        self._session: AgoraSession | None = None
+        self._pending_offer_id: str | None = None      # the offer being negotiated
+        self._early_candidates: list[IceCandidate] = []
+
+    async def async_handle_async_webrtc_offer(self, offer_sdp, session_id, send_message) -> None:
+        # ... 409 when self._join_lock is held ...
+        async with self._join_lock:
+            self._pending_offer_id = session_id
+            self._early_candidates = []
+            self._sessions[session_id] = send_message
+            await self.coordinator.async_register_camera_session(self.entity_description.key)
+            answered = False
+            try:
+                answered = await self._async_answer_offer(offer_sdp, session_id, send_message)
+            finally:
+                self._pending_offer_id = None
+                if not answered:
+                    self.close_webrtc_session(session_id)
+                elif not self._sessions:
+                    await self.async_close_webrtc_session()  # the viewer left mid-negotiation
+
+    async def _async_answer_offer(self, offer_sdp, session_id, send_message) -> bool:
+        stream_data, ap = await self.coordinator.async_check_stream_expiry(force=True)
+        await self.coordinator.async_send_command("send_todev_ble_sync", sync_type=3)
+        if not stream_data:
+            send_message(WebRTCError("500", "No stream data available for WebRTC offer"))
+            return False
+        if self.entity_description.target_uid != 1 and not self.coordinator.all_cameras_streaming:
+            send_message(WebRTCError("503", "Vision stream unavailable"))
+            return False
+        if ap is None:
+            send_message(WebRTCError("500", "No Agora edge available for WebRTC offer"))
+            return False
+        await self._async_close_session()  # sessions are single-use; the old keep-alive must stop
+        session = self._new_session(stream_data, ap)
+        for candidate in self._early_candidates:
+            session.add_ice_candidate(candidate)
+        self._early_candidates = []
+        self._session = session
+        try:
+            answer = await session.join(offer_sdp, session_id)
+        except PyAgoraRTCError as err:
+            send_message(WebRTCError("500", f"WebRTC negotiation failed: {err}"))
+            return False  # the caller's finally closes the session
+        send_message(WebRTCAnswer(answer))
+        return True
 
     def _new_session(self, data: StreamSubscriptionResponse, ap: APResponse) -> AgoraSession:
+        if data.openEncrypt:
+            _LOGGER.warning("Stream token has openEncrypt=%s; expect no picture", data.openEncrypt)  # D20, Q6
         deadline = None
         if self.coordinator.is_on_4g and data.availableTime and data.availableTime > 0:
             deadline = time.monotonic() + data.availableTime
@@ -273,62 +356,54 @@ class MammotionWebRTCCamera(MammotionCameraBaseEntity):
             on_peer_left=self._on_peer_left,
             on_closed=self._on_closed,
             keepalive=self._fpv_keepalive,      # MQTT refresh_fpv on 4G; returns False on WiFi
-            keepalive_interval_s=3.0,
             deadline=deadline,
-            spawn=lambda coro: self.hass.async_create_background_task(
-                coro, f"mammotion agora {self.entity_id}"
-            ),
+            spawn=lambda coro: self.hass.async_create_background_task(coro, f"{DOMAIN} agora {self.entity_id}"),
         )
 
-    async def _async_answer_offer(self, offer_sdp, session_id, send_message) -> bool:
-        stream_data, ap = await self.coordinator.async_check_stream_expiry(force=True)
-        if stream_data is None or ap is None:
-            send_message(WebRTCError("500", "No stream data available for WebRTC offer"))
-            return False
-        # ... target_uid / all_cameras_streaming check unchanged ...
-        await self.coordinator.async_send_command("send_todev_ble_sync", sync_type=3)
-        session = self._new_session(stream_data, ap)
-        for candidate in self._early_candidates:
-            session.add_ice_candidate(candidate)
-        self._early_candidates = []
-        self._session = session
-        try:
-            answer = await session.join(offer_sdp, session_id)
-        except PyAgoraRTCError as err:
-            _LOGGER.warning("Agora join failed: %s", err)
-            send_message(WebRTCError("500", f"WebRTC negotiation failed: {err}"))
-            return False  # the caller's finally closes the session
-        send_message(WebRTCAnswer(answer))
-        return True
-
     async def async_on_webrtc_candidate(self, session_id, candidate) -> None:
-        if self._session is None:
-            self._early_candidates.append(to_ice_candidate(candidate))
-        else:
-            self._session.add_ice_candidate(to_ice_candidate(candidate))
+        if session_id != self._pending_offer_id:
+            return  # not the offer being negotiated; Agora has no trickle message (Q4)
+        self._early_candidates.append(to_ice_candidate(candidate))
 
     async def async_close_webrtc_session(self) -> None:
+        await self._async_close_session()
+        await self.coordinator.async_release_camera_session(self.entity_description.key)
+
+    async def _async_close_session(self) -> None:
         if (session := self._session) is not None:
             self._session = None
             await session.close()
-        await self.coordinator.async_release_camera_session(self.entity_description.key)
 
     async def _on_peer_left(self, uid: int) -> None:
         await self._recover_stream()  # BLE sync + get_stream_subscription, unchanged
 
     async def _on_closed(self, reason: CloseReason) -> None:
-        if reason is CloseReason.CLOSED_BY_HOST:
+        if reason in (CloseReason.CLOSED_BY_HOST, CloseReason.JOIN_FAILED):
             return
+        viewers = list(self._sessions.values())
+        if not viewers:
+            return
+        self._sessions.clear()
         message = {
             CloseReason.GATEWAY_QUIT: "Another camera on this mower took over the stream",
             CloseReason.DEADLINE: "4G streaming budget exhausted",
         }.get(reason, "Stream lost")
-        viewers = list(self._sessions.values())
-        self._sessions.clear()
         for send_message in viewers:
             send_message(WebRTCError("503", message))
         await self.async_close_webrtc_session()
 ```
+
+Why each piece is there:
+
+| Piece | Reason |
+|---|---|
+| Checks run stream data → uid gate → AP response | No token is a 500; a vision camera without `all_cameras_streaming` is a 503 before any AP use; a missing AP response is a clean 500 rather than an `AttributeError` in the session. |
+| `_async_close_session()` before `_new_session` | A session is single-use (architecture §2). Left running, the previous one's keep-alive keeps sending `refresh_fpv`. |
+| `_pending_offer_id` / `_early_candidates` | Candidates are buffered for the offer being negotiated and added before `join` (D11). A candidate for any other offer id is dropped. One that arrives after `join` starts lands in the buffer and is discarded with it; the session would ignore it anyway (Q4). |
+| `_on_closed` returns on `JOIN_FAILED` | The session fires `on_closed(JOIN_FAILED)` before `join()` raises (D9, D23). The 500 in `_async_answer_offer` already told the viewer; a 503 on top would be a second error. |
+| `_on_closed` returns on `CLOSED_BY_HOST` | The host is already in its own close path (§1.5). |
+| `_on_closed` returns with no viewer left | Nobody to tell, and `async_close_webrtc_session` already ran or will. |
+| `keepalive_interval_s` not passed | The default (`const.KEEPALIVE_INTERVAL_S`, 3 s) is the shipped Mammotion cadence (D15). |
 
 `async_teardown_stream` replaces `self._agora_handler.disconnect()` with the
 same `session.close()`. `_fpv_keepalive` and `_recover_stream` are
@@ -341,10 +416,11 @@ subclasses (§1.4). `_perform_webrtc_negotiation` can be inlined.
 `token_provider` stays unset: the gateway accepts the join token on renew
 (D8), and minting a new Mammotion stream token restarts the mower's stream.
 
-The `deadline` is computed only on 4G. Today's loop enforces
-`availableTime` only while `keepalive` returns `True`, which it never does
+The `deadline` is computed only on 4G. The old loop enforced
+`availableTime` only while `keepalive` returned `True`, which it never does
 on WiFi. The library's deadline is independent of the keep-alive (D15), so
-gating it on `is_on_4g` keeps WiFi streams unbounded as they are now.
+gating it on `is_on_4g` at join time keeps WiFi streams unbounded as they
+were. See §2.5 for what that does to a mid-session network switch.
 
 ### 2.5 Behaviour changes Mammotion will see
 
@@ -365,43 +441,69 @@ gating it on `is_on_4g` keeps WiFi streams unbounded as they are now.
 | Background tasks are owned and awaited on close | D13 | Pass `spawn` (§1.5). |
 | Unchanged: no `set_client_role` (D6), ORTC DTLS role `server` (D4), `a=setup` mirrors the gateway (D5), MID stripped from the answer (D16), `leave` on close, 30 s renew debounce (D8) | | |
 
+Behaviour changes observed in the real migration (`pyagorartc-migration`):
+
+| Change | Decision | Note |
+|---|---|---|
+| The 4G deadline is fixed at join time | D15 | Before, a mid-session switch to WiFi made `keepalive` return `False`, the loop exited, and `availableTime` stopped being enforced. Now the deadline still fires on a session that joined on 4G. A session that joined on WiFi still has none. |
+| A failed AP call keeps the previous AP response | D1 | As before: `ice_servers` is cleared, `_agora_response` is not, so the next offer pairs the new token with the last good AP answer. |
+| The D20 encryption WARNING fires per offer | D20, Q6 | `_new_session` logs one whenever `openEncrypt` is set; the library adds its own when `key` is also present. |
+
 ### 2.6 Manifest and requirements
 
 `custom_components/mammotion/manifest.json`:
 
 ```json
+"loggers": [
+  "pymammotion",
+  "pyagorartc"
+],
 "requirements": [
   "pymammotion==0.10.1",
-  "pyagorartc==x.y.z"
+  "pyagorartc==0.2.0"
 ]
 ```
 
-HA-Luba pins neither `sdp-transform` nor `websockets` today; both arrive
-through `pymammotion`, which declares `sdp-transform>=1.1.0`,
-`websockets>=13.1` and `webrtc-models>=0.3.0` and imports none of them.
-Once HA-Luba no longer ships `agora_*.py`, drop those three from
-`pymammotion`'s `pyproject.toml` in its next release. Until then they are
-harmless duplicates.
+`pyagorartc` in `loggers` lets HA's debug-logging toggle capture the
+library, which the Q11 run needs (§4).
+
+| File | Before | After |
+|---|---|---|
+| `manifest.json` `requirements` | `pymammotion` only | adds `pyagorartc` |
+| `manifest.json` `loggers` | `pymammotion` | adds `pyagorartc` |
+| `pyproject.toml` `dependencies` | `websockets>=15.0.1`, `sdp-transform>=1.1.0` | both dropped; `pyagorartc==0.2.0` added (it declares both, §1.6) |
+| `uv.lock` | | regenerated with `uv lock` |
+
+The manifest never pinned `websockets` or `sdp-transform`; only the dev
+`pyproject.toml` did. HA-Luba's dev venv links `pymammotion` to a local
+checkout, so run its tests with `uv run --no-sync` after locking, or the
+sync replaces the link.
+
+`pymammotion` still declares `sdp-transform>=1.1.0`, `websockets>=13.1` and
+`webrtc-models>=0.3.0` and imports none of them. Drop them in its next
+release (backlog). Until then they are harmless duplicates.
 
 ### 2.7 Checklist
 
-- [ ] Add `pyagorartc==x.y.z` to `manifest.json`.
-- [ ] Add `mammotion_credentials()` (§2.2) next to the coordinator.
-- [ ] `coordinator.py`: replace the `AgoraAPIClient` block (§2.3); import
-      `APResponse` for the `async_check_stream_expiry` return type.
-- [ ] `camera.py`: drop `AgoraWebSocketHandler` from `__init__`; add
-      `_session`, `_early_candidates`, `_new_session`, `_on_peer_left`,
-      `_on_closed` (§2.4).
-- [ ] `camera.py`: replace every `self._agora_handler.disconnect()` with
-      `session.close()`; drop the `websockets` and `json` imports used only
-      for the old catch.
-- [ ] Decide what to do on `openEncrypt != 0` (warn or refuse) (D20).
-- [ ] Delete `agora_api.py`, `agora_sdp.py`, `agora_websocket.py`.
-- [ ] Delete `tests_ha/test_agora_*.py` and `test_fpv_keepalive.py` once
-      the library tests cover them; keep host tests for `_on_closed` and
-      `_new_session`'s deadline gating.
-- [ ] Run one Wi-Fi and one 4G session on a Luba 2 and a Yuka (all three
-      `target_uid`s) before release.
+Done on HA-Luba's `pyagorartc-migration` branch:
+
+- [x] Add `pyagorartc` to `manifest.json` `requirements` and `loggers` (§2.6).
+- [x] Add `stream_session.py` with `mammotion_credentials`,
+      `async_choose_server`, `to_rtc_ice_servers`, `to_ice_candidate` (§2.3).
+- [x] `coordinator.py`: replace the `AgoraAPIClient` block (§2.3); return
+      `APResponse` from `async_check_stream_expiry`.
+- [x] `camera.py`: `async_setup_entry` uses `to_rtc_ice_servers`; drop
+      `AgoraWebSocketHandler`; add `_session`, `_pending_offer_id`,
+      `_early_candidates`, `_new_session`, `_on_peer_left`, `_on_closed` (§2.4).
+- [x] `openEncrypt != 0`: warn, do not refuse (D20).
+- [x] Delete `agora_api.py`, `agora_sdp.py`, `agora_websocket.py` and the six
+      Agora tests (§2.1).
+- [x] Drop `websockets` and `sdp-transform` from `pyproject.toml`; `uv lock`.
+
+Still open (backlog):
+
+- [ ] Run one WiFi and one 4G session on a Luba 2 and a Yuka, every camera
+      `target_uid`, before release (Q2, Q5, Q6, Q10, Q11; §4).
 - [ ] Open a `pymammotion` change dropping its unused `sdp-transform`,
       `websockets` and `webrtc-models` requirements.
 
@@ -482,8 +584,8 @@ today (502). `LiveFeed` carries no encryption fields, so `encryption` stays
 ```python
 async def _refresh_agora_context(self, creds: ChannelCredentials) -> None:
     self._agora_response = None
-    async with AgoraAPClient(async_get_clientsession(self.hass)) as ap_client:
-        self._agora_response = await ap_client.choose_server(creds)
+    client = AgoraAPClient(async_get_clientsession(self.hass))  # borrowed: no async with (§2.3)
+    self._agora_response = await client.choose_server(creds)
     self._ice_servers = to_rtc_ice_servers(self._agora_response)
 ```
 
@@ -674,10 +776,10 @@ only pyagorartc imports them, and it declares both (§1.6). The exact
 |---|---|---|---|
 | Q2 DTLS role in the ORTC | yes | yes | One session with `SessionOptions(ortc_dtls_role=None)`. DTLS completes and video plays → the SDK's "send none" is safe. |
 | Q3 `set_client_role` after join | — (mowers leave when it is sent, D6) | yes | One session with `send_set_client_role=False`. Video still flows after 10 s → drop the flag. |
-| Q5 AP detail `8`/`4` TURN credentials | yes | yes | `get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)` with a relay-only viewer; a TURN 401 in the browser's ICE log answers it. |
-| Q6 `openEncrypt` | yes | — (`LiveFeed` has no such field) | Log `openEncrypt` from every stream-token response for a while; a non-zero value is the answer, and a capture of that session is wanted. |
-| Q10 `enablePreallocPC` / `enableInstantVideo` | `instant_video` on/off | both | Compare time to first frame. `enablePreallocPC` has no option today; answering it needs one. |
-| Q11 renew debounce | yes | yes | Leave a session running past token expiry with DEBUG logs; count `renew_token` sends and any gateway error after repeats. Changing the 30 s needs `const.RENEW_TOKEN_DEBOUNCE_S` patched; there is no option. |
+| Q5 AP detail `8`/`4` TURN credentials | yes | yes | `get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)` in `to_rtc_ice_servers`, with a relay-only browser (`iceTransportPolicy: "relay"`). A TURN 401 in the browser's ICE log answers it. |
+| Q6 `openEncrypt` | yes | — (`LiveFeed` has no such field) | Nothing to add on Mammotion: the WARNING already fires per offer when `openEncrypt` is set (§2.5). Watch the log; a hit is the answer, and a capture of that session is wanted. |
+| Q10 `enablePreallocPC` / `enableInstantVideo` | yes | yes | Flip `SessionOptions(instant_video=True)` and, separately, `prealloc_pc=False`. Compare time to first frame against the defaults. |
+| Q11 renew debounce | yes | yes | Enable debug logging for `pyagorartc` (in `loggers` on Mammotion, §2.6), leave a session running past token expiry, and count `renew_token` sends and any gateway error after repeats. `SessionOptions(renew_debounce_s=...)` changes the 30 s window. |
 
 Report each result as a new decision in `decisions.md` that closes the
 question.

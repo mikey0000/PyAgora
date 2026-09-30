@@ -31,9 +31,12 @@ Open work only; finished items are deleted.
 
 ## Hosts
 
-- HA-Luba: replace `custom_components/mammotion/agora_*.py` with `pyagorartc`
-  per `docs/migration.md`; keep its six Agora tests as library tests (done
-  here) and delete the local copies.
+- HA-Luba: merge the `pyagorartc-migration` branch (`docs/migration.md` §2)
+  once the hardware run below passes.
+- HA-Luba: run one WiFi and one 4G session on a Luba 2 and a Yuka across all
+  camera uids to validate the migration (Q2, Q5, Q6, Q10, Q11; migration §4).
+- pymammotion drops its unused `sdp-transform`, `websockets`, `webrtc-models`
+  requirements.
 - PetKit: migration per `docs/migration.md`; the `set_client_role` question
   (Q3) must be answered on real hardware before the default changes for
   them.
