@@ -1,6 +1,6 @@
 # Architecture
 
-`pyagora` drives an Agora RTC session from Python so that a WebRTC consumer
+`pyagorartc` drives an Agora RTC session from Python so that a WebRTC consumer
 that is not the Agora SDK (a browser, go2rtc, pion) can receive a stream a
 device publishes to an Agora channel. It does three things: find the edge
 (`ap/`), translate between the consumer's SDP and Agora's ORTC (`sdp/`), and
@@ -55,7 +55,7 @@ Imports go downward only: `session/` may import `sdp/`, `ap/`, `models`,
 `exceptions`, `const`; `ap/` and `rtm/` import only `models`, `exceptions`,
 `const`; `sdp/` imports only `models`, `exceptions` and `const` (values, never
 I/O). Nothing under
-`pyagora/` imports `homeassistant`, `webrtc_models`, `pymammotion`,
+`pyagorartc/` imports `homeassistant`, `webrtc_models`, `pymammotion`,
 `pypetkitapi`, `go2rtc_client`, or any other host or vendor package.
 `tests/meta/test_conventions.py` asserts this.
 

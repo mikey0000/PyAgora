@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyagora import const
-from pyagora.models import (
+from pyagorartc import const
+from pyagorartc.models import (
     ChannelCredentials,
     ChannelEncryption,
     CloseReason,

@@ -11,8 +11,8 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from pyagora.ap.password import derive_password
-from pyagora.const import (
+from pyagorartc.ap.password import derive_password
+from pyagorartc.const import (
     AP_FLAG_GATEWAY,
     AP_FLAG_TURN,
     EDGE_DOMAIN_SUFFIX,
@@ -20,8 +20,8 @@ from pyagora.const import (
     TURN_PORT,
     TURNS_PORT,
 )
-from pyagora.exceptions import APError, APRejectedError
-from pyagora.models import EdgeAddress, ICEServer, TurnCredentialStrategy, TurnMode, as_int, fingerprint
+from pyagorartc.exceptions import APError, APRejectedError
+from pyagorartc.models import EdgeAddress, ICEServer, TurnCredentialStrategy, TurnMode, as_int, fingerprint
 
 if TYPE_CHECKING:
     from collections.abc import Callable

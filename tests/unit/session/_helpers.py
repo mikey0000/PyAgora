@@ -7,18 +7,18 @@ import copy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from pyagora.ap import APResponse
-from pyagora.exceptions import GatewayConnectError
-from pyagora.models import SessionOptions
-from pyagora.sdp import parse_trickle_fragment
-from pyagora.session import AgoraSession
+from pyagorartc.ap import APResponse
+from pyagorartc.exceptions import GatewayConnectError
+from pyagorartc.models import SessionOptions
+from pyagorartc.sdp import parse_trickle_fragment
+from pyagorartc.session import AgoraSession
 from tests._helpers import CREDENTIALS, load_fixture, load_json_fixture
 from tests.unit._fakes import FakeGatewayConnection, FakeGatewayTransport, ManualClock, ManualSleep, Recorder
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
-    from pyagora.models import IceCandidate
+    from pyagorartc.models import IceCandidate
 
 OFFER = load_fixture("sdp/chrome_recvonly_offer.sdp")
 GO2RTC_OFFER = load_fixture("sdp/go2rtc_offer.sdp")

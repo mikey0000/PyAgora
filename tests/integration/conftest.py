@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import aiohttp
 import pytest
 
-from pyagora.ap import AgoraAPClient
+from pyagorartc.ap import AgoraAPClient
 from tests._helpers import CREDENTIALS
 from tests.fakegateway import FakeAgora, FakeAgoraState
 from tests.integration._helpers import (
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
     from websockets.asyncio.client import ClientConnection
 
-    from pyagora.ap import APResponse
-    from pyagora.models import SessionOptions
+    from pyagorartc.ap import APResponse
+    from pyagorartc.models import SessionOptions
     from tests.integration._helpers import SessionRig
 
 

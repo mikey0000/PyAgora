@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pyagora.const import (
+from pyagorartc.const import (
     KEEPALIVE_INTERVAL_S,
     PEER_RECOVER_COOLDOWN_S,
     PEER_RECOVER_MAX_ATTEMPTS,
@@ -10,7 +10,7 @@ from pyagora.const import (
     PEER_REJOIN_DEBOUNCE_S,
     RENEW_TOKEN_DEBOUNCE_S,
 )
-from pyagora.session.recovery import Keepalive, PeerRecovery, RenewDebounce
+from pyagorartc.session.recovery import Keepalive, PeerRecovery, RenewDebounce
 from tests.unit._fakes import ManualClock
 
 if TYPE_CHECKING:

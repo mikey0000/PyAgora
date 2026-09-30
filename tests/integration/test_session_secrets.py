@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.const import PEER_REJOIN_DEBOUNCE_S
-from pyagora.models import SessionOptions
+from pyagorartc.const import PEER_REJOIN_DEBOUNCE_S
+from pyagorartc.models import SessionOptions
 from tests._helpers import RENEWED_TOKEN, RTC_TOKEN, SECRET_VALUES, leaked_secrets
 from tests.unit._fakes import Recorder
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pyagora.ap import APResponse
+    from pyagorartc.ap import APResponse
     from tests.fakegateway import FakeAgora
     from tests.integration._helpers import SessionRig
 

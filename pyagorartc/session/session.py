@@ -14,18 +14,18 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from pyagora.ap.response import fingerprints_from_edge
-from pyagora.const import (
+from pyagorartc.ap.response import fingerprints_from_edge
+from pyagorartc.const import (
     DECLARED_SSRC_TIMEOUT_S,
     EDGE_DOMAIN_SUFFIX,
     GATEWAY_SEND_TIMEOUT_S,
     KEEPALIVE_INTERVAL_S,
     PING_INTERVAL_S,
 )
-from pyagora.exceptions import GatewayConnectError, JoinTimeoutError, SessionClosedError
-from pyagora.models import CloseReason, IceCandidate, SessionOptions, fingerprint
-from pyagora.sdp import answer_from_ortc, candidates_to_ortc, extract_inline_candidates, offer_to_ortc
-from pyagora.session.messages import (
+from pyagorartc.exceptions import GatewayConnectError, JoinTimeoutError, SessionClosedError
+from pyagorartc.models import CloseReason, IceCandidate, SessionOptions, fingerprint
+from pyagorartc.sdp import answer_from_ortc, candidates_to_ortc, extract_inline_candidates, offer_to_ortc
+from pyagorartc.session.messages import (
     JOIN_ROLE,
     FrameType,
     build_join,
@@ -50,16 +50,16 @@ from pyagora.session.messages import (
     parse_rtp_capability_change,
     parse_user_event,
 )
-from pyagora.session.recovery import Keepalive, PeerRecovery, RenewDebounce
-from pyagora.session.transport import WebsocketsTransport
+from pyagorartc.session.recovery import Keepalive, PeerRecovery, RenewDebounce
+from pyagorartc.session.transport import WebsocketsTransport
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
 
-    from pyagora.ap.response import APResponse
-    from pyagora.models import ChannelCredentials, EdgeAddress, RemoteStream
-    from pyagora.session.messages import GatewayFrame, JoinResult, JsonObject
-    from pyagora.session.transport import GatewayConnection, GatewayTransport
+    from pyagorartc.ap.response import APResponse
+    from pyagorartc.models import ChannelCredentials, EdgeAddress, RemoteStream
+    from pyagorartc.session.messages import GatewayFrame, JoinResult, JsonObject
+    from pyagorartc.session.transport import GatewayConnection, GatewayTransport
 
 _LOGGER = logging.getLogger(__name__)
 

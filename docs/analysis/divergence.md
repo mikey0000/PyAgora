@@ -1,10 +1,10 @@
-# pyagora divergence analysis (A / B / C)
+# pyagorartc divergence analysis (A / B / C)
 
 ## Path key
 
 | Tag | Files |
 |---|---|
-| **A** (PyAgora, oldest) | `/home/michael/git/PyAgora/agora_api.py` (851 lines), `agora_sdp.py` (527), `agora_websockets.py` (1775). HEAD `429e2f4`. Working tree has one uncommitted change: `agora_websockets.py:444`, which comments out `await self._send_set_client_role(role="host", level=0)`. **At HEAD the call is still live.** |
+| **A** (PyAgoraRTC, oldest) | `/home/michael/git/PyAgoraRTC/agora_api.py` (851 lines), `agora_sdp.py` (527), `agora_websockets.py` (1775). HEAD `429e2f4`. Working tree has one uncommitted change: `agora_websockets.py:444`, which comments out `await self._send_set_client_role(role="host", level=0)`. **At HEAD the call is still live.** |
 | **B** (HA-Luba, Mammotion) | `/home/michael/git/HA-Luba/custom_components/mammotion/agora_api.py` (855), `agora_sdp.py` (533), `agora_websocket.py` (2061), `camera.py` (646), `coordinator.py:543-652` (the choose_server caller); token model `/home/michael/git/Luba-API/pymammotion/http/model/camera_stream.py:14-30` |
 | **C** (PetKit) | `…/scratchpad/petkit/custom_components/petkit/agora_api.py` (465), `agora_sdp.py` (251), `agora_websocket.py` (1216), `agora_rtm.py` (394), `webrtc_common.py` (163), `camera.py` (679), `whep_proxy.py` (738), `go2rtc_stream.py` (505) |
 | JS reference | `/home/michael/git/HA-Luba/agoraRTC_N-4.24.3.js`. Used below to decide conflicts. |
@@ -14,8 +14,8 @@ Short forms: `Bapi`, `Bsdp`, `Bws` are B's three modules, and the same pattern a
 ### Headline facts
 
 1. **Neither A nor B can be imported as a library today.**
-   - A: `Aws:18` imports `homeassistant.core`, and `Aws:26` imports `.coordinator`, a module PyAgora does not have.
-   - B: `Bapi:120` annotates `-> AgoraResponse` without `from __future__ import annotations`. I verified that this raises `NameError: name 'AgoraResponse' is not defined` at import on CPython 3.13.8, while 3.14.5 works because of PEP 649. PyAgora's `pyproject.toml` declares `requires-python >=3.13`.
+   - A: `Aws:18` imports `homeassistant.core`, and `Aws:26` imports `.coordinator`, a module PyAgoraRTC does not have.
+   - B: `Bapi:120` annotates `-> AgoraResponse` without `from __future__ import annotations`. I verified that this raises `NameError: name 'AgoraResponse' is not defined` at import on CPython 3.13.8, while 3.14.5 works because of PEP 649. PyAgoraRTC's `pyproject.toml` declares `requires-python >=3.13`.
 2. **The `api` modules are already host-clean in all three copies.** No `hass`, host model or host logger is imported. All coupling sits in the websocket module and its consumers.
 3. **C's line-count shrinkage is mostly dead-code removal, plus one real regression.** C's `agora_sdp` parser never parses `a=rtcp-fb`, so the ORTC sent to Agora carries no RTCP feedback at all. I checked this by running both parsers on the same offer (see §1.2).
 4. **The JS SDK decides several A/B vs C conflicts:**
@@ -261,7 +261,7 @@ Token refresh stays out of the dataclass. It is injected as `token_provider: Cal
 - Success: `result == "success"` and `code ∈ {message_sent, message_delivered}` (plus `message_offline` for stop) (`:28-36,300`).
 - Retries: 404 or 5xx/429 moves to the next endpoint, and the last good endpoint is remembered (`:267-279,321-333`).
 - PetKit command vocabulary: `start_live {isSD}` ×5 retries at 1 s (`:159-188`), `live_heartbeat {isSD}` every 0.5 s, stopping after 10 failures (`:341-368`), `stop_live` (`:378-385`), `ptz_ctrl {type, ptz_dir}` (`:87-99`).
-- Split: the REST transport (endpoint rotation, auth headers, ack semantics, `send_peer_message`) is **generic Agora** and fits pyagora as `pyagora.rtm.RtmRestClient`. The `start_live`/heartbeat/`ptz` vocabulary is **PetKit protocol** and stays in the integration or its vendor lib.
+- Split: the REST transport (endpoint rotation, auth headers, ack semantics, `send_peer_message`) is **generic Agora** and fits pyagorartc as `pyagorartc.rtm.RtmRestClient`. The `start_live`/heartbeat/`ptz` vocabulary is **PetKit protocol** and stays in the integration or its vendor lib.
 
 **`whep_proxy.py`** has two managers plus HA views.
 - `PetkitAgoraUpstreamManager` (`:113-296`) turns a WHEP offer (from go2rtc) into an Agora answer: it refreshes the live feed, calls choose_server, extracts inline `a=candidate` lines, filters them, starts RTM, runs `connect_and_join` with the P options, and builds a location path and a 20-minute RTM token refresh loop.
@@ -275,7 +275,7 @@ Token refresh stays out of the dataclass. It is injected as `token_provider: Cal
 
 **`camera.py` (C)** relays browser ↔ go2rtc over `go2rtc_client.ws` with PENDING/ACTIVE candidate buffering (glue). `_filter_candidates` (`:654-671`) is a pure helper for the library.
 
-**Belongs in pyagora:** the AP client, SDP↔ORTC, the answer builder, the WS session (with C's options), the candidate filter, WHEP-fragment candidate parsing, and the RTM REST transport. **Stays in integrations:** the HA views/auth, go2rtc stream management, the browser relay, PetKit RTM command vocabulary and wake/refresh (`webrtc_common.py`), and Mammotion FPV/BLE-sync recovery policies.
+**Belongs in pyagorartc:** the AP client, SDP↔ORTC, the answer builder, the WS session (with C's options), the candidate filter, WHEP-fragment candidate parsing, and the RTM REST transport. **Stays in integrations:** the HA views/auth, go2rtc stream management, the browser relay, PetKit RTM command vocabulary and wake/refresh (`webrtc_common.py`), and Mammotion FPV/BLE-sync recovery policies.
 
 ---
 
@@ -287,7 +287,7 @@ Call sites:
 - Nobody reads `is_connected` outside the handler.
 
 ```python
-# pyagora.ap
+# pyagorartc.ap
 class AgoraAPClient:
     def __init__(self, session: aiohttp.ClientSession | None = None, *, verify_ssl: bool = True) -> None: ...
     async def __aenter__(self) -> Self: ...
@@ -306,7 +306,7 @@ class APResponse:  # today's AgoraResponse
     def to_ap_response(self, flag: int | None = None) -> dict[str, Any]: ...
     def turn_server_config(self, gateway: EdgeAddress | None, token: str | None) -> dict[str, Any]: ...
 
-# pyagora.session
+# pyagorartc.session
 @dataclass(frozen=True, kw_only=True)
 class SessionOptions:
     client_codec: str = "vp8"; target_uid: int | None = None
@@ -331,7 +331,7 @@ class AgoraSession:
     @property
     def remote_users(self) -> frozenset[int]: ...
 
-# pyagora.rtm
+# pyagorartc.rtm
 class RtmRestClient:
     def __init__(self, creds: RtmCredentials, session: aiohttp.ClientSession | None = None) -> None: ...
     async def send_peer_message(self, payload: Mapping[str, Any], *, wait_for_ack: bool,
@@ -339,7 +339,7 @@ class RtmRestClient:
     def update_token(self, token: str) -> None: ...
     async def close(self) -> None: ...
 
-# pyagora.sdp (pure)
+# pyagorartc.sdp (pure)
 def offer_to_ortc(offer_sdp: str) -> dict[str, Any]: ...
 def answer_from_ortc(ortc: dict[str, Any], offer_sdp: str, *, strip_mid: bool = True,
                      remote_video: RemoteStream | None = None, disable_audio: bool = False) -> str: ...
@@ -360,11 +360,11 @@ Mapping from today's calls:
 | Dep | Used by | Needed? |
 |---|---|---|
 | `aiohttp` | AP client (FormData POST); RTM REST; dead `_get_agora_edge_services` (`Bws:1874-1894`, MultipartWriter) | **Yes** (AP, RTM). Only the `ClientSession` API is used. |
-| `websockets` | `websockets.asyncio.client.connect/ClientConnection`, `WebSocketException` (`Bws:23-24`, `Cws:19-20`) | **Yes.** The asyncio client exists since **13.0**, and nothing 15/16-specific is used. PyAgora pins `>=16.0`, HA-Luba `>=15.0.1`, PetKit `==15.0.1` (its manifest). A floor of `>=13` (or `>=14`) avoids fighting HA's pin. |
+| `websockets` | `websockets.asyncio.client.connect/ClientConnection`, `WebSocketException` (`Bws:23-24`, `Cws:19-20`) | **Yes.** The asyncio client exists since **13.0**, and nothing 15/16-specific is used. PyAgoraRTC pins `>=16.0`, HA-Luba `>=15.0.1`, PetKit `==15.0.1` (its manifest). A floor of `>=13` (or `>=14`) avoids fighting HA's pin. |
 | `sdp-transform` | `_parse_offer_sdp` in B/C; `whep_proxy._parse_trickle_candidates` | **Redundant with `agora_sdp.SDPParser`.** B and C both parse every offer twice with two different parsers, and the hand parser has the direction bug (B) or the rtcp-fb gap (C). Keep one. sdp-transform is pure Python and small, and parses direction, candidates and rtcp-fb correctly. |
-| `webrtc_models` | `RTCIceCandidateInit` (handler), `RTCIceServer` (hosts) | **Not needed** by the library: replace with its own dataclass. It is not declared in PyAgora's `pyproject.toml` although A imports it. |
+| `webrtc_models` | `RTCIceCandidateInit` (handler), `RTCIceServer` (hosts) | **Not needed** by the library: replace with its own dataclass. It is not declared in PyAgoraRTC's `pyproject.toml` although A imports it. |
 | `homeassistant` | A/B websocket type import | **No** (only `async_create_task`) |
-| `ruff` | listed as a *runtime* dependency in `PyAgora/pyproject.toml` | Move it to dev |
+| `ruff` | listed as a *runtime* dependency in `PyAgoraRTC/pyproject.toml` | Move it to dev |
 | `go2rtc_client`, `pypetkitapi`, `pymammotion` | hosts only | No |
 
 ---

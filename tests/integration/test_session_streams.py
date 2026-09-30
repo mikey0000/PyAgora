@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from pyagora.const import PEER_REJOIN_DEBOUNCE_S
-from pyagora.models import RemoteStream, SessionOptions
+from pyagorartc.const import PEER_REJOIN_DEBOUNCE_S
+from pyagorartc.models import RemoteStream, SessionOptions
 from tests.fakegateway._common import DEVICE_SSRC, DEVICE_UID
 from tests.integration._helpers import SESSION_TIMEOUT_S
 from tests.unit._fakes import Recorder

@@ -1,23 +1,23 @@
-"""pyagora: an async client for Agora RTC signalling.
+"""pyagorartc: an async client for Agora RTC signalling.
 
 ``__all__`` is the supported surface (Constitution §10).
 """
 
 from __future__ import annotations
 
-from pyagora.ap import AgoraAPClient, APResponse
-from pyagora.exceptions import (
+from pyagorartc.ap import AgoraAPClient, APResponse
+from pyagorartc.exceptions import (
     APError,
     APRejectedError,
     GatewayConnectError,
     JoinRejectedError,
     JoinTimeoutError,
-    PyAgoraError,
+    PyAgoraRTCError,
     RtmError,
     SdpError,
     SessionClosedError,
 )
-from pyagora.models import (
+from pyagorartc.models import (
     ChannelCredentials,
     ChannelEncryption,
     CloseReason,
@@ -31,9 +31,9 @@ from pyagora.models import (
     TurnMode,
     fingerprint,
 )
-from pyagora.rtm import RtmRestClient
-from pyagora.sdp import extract_inline_candidates, filter_candidates, parse_trickle_fragment
-from pyagora.session import AgoraSession
+from pyagorartc.rtm import RtmRestClient
+from pyagorartc.sdp import extract_inline_candidates, filter_candidates, parse_trickle_fragment
+from pyagorartc.session import AgoraSession
 
 __all__ = [
     "APError",
@@ -50,7 +50,7 @@ __all__ = [
     "IceCandidate",
     "JoinRejectedError",
     "JoinTimeoutError",
-    "PyAgoraError",
+    "PyAgoraRTCError",
     "RemoteStream",
     "RtmCredentials",
     "RtmError",

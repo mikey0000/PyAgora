@@ -9,9 +9,9 @@ from typing import Any
 import aiohttp
 import pytest
 
-from pyagora.const import RTM_HOSTS
-from pyagora.exceptions import RtmError
-from pyagora.rtm import RtmRestClient
+from pyagorartc.const import RTM_HOSTS
+from pyagorartc.exceptions import RtmError
+from pyagorartc.rtm import RtmRestClient
 from tests._helpers import RTM_CREDENTIALS, RTM_TOKEN, leaked_secrets, load_fixture, load_json_fixture
 from tests.unit._fakes import FakeMisuseError, RecordingHttpSession
 
@@ -352,7 +352,7 @@ class TestSecrets:
         client, _ = make_client(TimeoutError(), (503, {}), ack("ack_failed"))
         client.update_token(NEW_TOKEN)
 
-        with caplog.at_level(logging.DEBUG, logger="pyagora.rtm"), pytest.raises(RtmError):
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.rtm"), pytest.raises(RtmError):
             await client.send_peer_message(PAYLOAD)
 
         messages = [r.getMessage() for r in caplog.records]

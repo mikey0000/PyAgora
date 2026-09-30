@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_DIR = REPO_ROOT / "pyagora"
+PACKAGE_DIR = REPO_ROOT / "pyagorartc"
 PACKAGE = PACKAGE_DIR.name
 TESTS_DIR = REPO_ROOT / "tests"
 UNIT_DIR = TESTS_DIR / "unit"

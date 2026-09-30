@@ -7,11 +7,11 @@ condition; no exception ever carries a token, ticket, credential or key.
 from __future__ import annotations
 
 
-class PyAgoraError(Exception):
+class PyAgoraRTCError(Exception):
     """Base class for every error raised by this library."""
 
 
-class APError(PyAgoraError):
+class APError(PyAgoraRTCError):
     """Edge discovery failed: every access point host was tried and none answered usefully."""
 
     def __init__(self, message: str, *, status: int | None = None) -> None:
@@ -27,15 +27,15 @@ class APRejectedError(APError):
         self.codes = codes
 
 
-class SdpError(PyAgoraError):
+class SdpError(PyAgoraRTCError):
     """An SDP offer could not be turned into ORTC, or an answer could not be built from the gateway ORTC."""
 
 
-class GatewayConnectError(PyAgoraError):
+class GatewayConnectError(PyAgoraRTCError):
     """The gateway WebSocket could not be opened on any edge."""
 
 
-class JoinRejectedError(PyAgoraError):
+class JoinRejectedError(PyAgoraRTCError):
     """The gateway answered the join with a failure result."""
 
     def __init__(self, code: int | None, message: str) -> None:
@@ -44,15 +44,15 @@ class JoinRejectedError(PyAgoraError):
         self.message = message
 
 
-class JoinTimeoutError(PyAgoraError):
+class JoinTimeoutError(PyAgoraRTCError):
     """The gateway did not answer the join within the configured timeout."""
 
 
-class SessionClosedError(PyAgoraError):
+class SessionClosedError(PyAgoraRTCError):
     """An operation was attempted on a session that has already ended."""
 
 
-class RtmError(PyAgoraError):
+class RtmError(PyAgoraRTCError):
     """An RTM peer message could not be delivered on any endpoint."""
 
     def __init__(self, message: str, *, status: int | None = None, code: str | None = None) -> None:

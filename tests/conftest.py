@@ -12,7 +12,7 @@ from tests._helpers import CREDENTIALS, leaked_secrets
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from pyagora.models import ChannelCredentials
+    from pyagorartc.models import ChannelCredentials
 
 
 @pytest.fixture

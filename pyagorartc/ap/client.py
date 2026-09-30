@@ -15,8 +15,8 @@ from urllib.parse import urlsplit
 
 import aiohttp
 
-from pyagora.ap.response import APResponse
-from pyagora.const import (
+from pyagorartc.ap.response import APResponse
+from pyagorartc.const import (
     AP_HOSTS,
     AP_PATH,
     AP_QUERY,
@@ -27,14 +27,14 @@ from pyagora.const import (
     ROLE_HOST,
     SERVICE_GATEWAY,
 )
-from pyagora.exceptions import APError, APRejectedError
-from pyagora.models import fingerprint
+from pyagorartc.exceptions import APError, APRejectedError
+from pyagorartc.models import fingerprint
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
     from types import TracebackType
 
-    from pyagora.models import ChannelCredentials, EdgeAddress
+    from pyagorartc.models import ChannelCredentials, EdgeAddress
 
 _LOGGER = logging.getLogger(__name__)
 

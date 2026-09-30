@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.const import (
+from pyagorartc.const import (
     PEER_RECOVER_COOLDOWN_S,
     PEER_RECOVER_MAX_ATTEMPTS,
     PEER_REJOIN_DEBOUNCE_S,
 )
-from pyagora.models import SessionOptions
+from pyagorartc.models import SessionOptions
 from tests._helpers import load_json_fixture
 from tests.unit.session._helpers import (
     MARKER_UID,

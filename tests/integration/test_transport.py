@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.exceptions import GatewayConnectError
-from pyagora.session import WebsocketsTransport
+from pyagorartc.exceptions import GatewayConnectError
+from pyagorartc.session import WebsocketsTransport
 from tests.integration._helpers import SESSION_TIMEOUT_S
 
 if TYPE_CHECKING:

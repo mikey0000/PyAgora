@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from pyagora.exceptions import SessionClosedError
-from pyagora.models import CloseReason, SessionOptions
+from pyagorartc.exceptions import SessionClosedError
+from pyagorartc.models import CloseReason, SessionOptions
 from tests._helpers import load_json_fixture
 from tests.unit.session._helpers import (
     OFFER,
@@ -65,7 +65,7 @@ class TestBoundedSends:
     @pytest.mark.regression
     async def test_a_leave_the_socket_never_accepts_does_not_hold_close(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """``close()`` awaited the ``leave`` send unbounded, so a stalled socket hung the host's teardown."""
-        monkeypatch.setattr("pyagora.session.session.GATEWAY_SEND_TIMEOUT_S", 0.0)
+        monkeypatch.setattr("pyagorartc.session.session.GATEWAY_SEND_TIMEOUT_S", 0.0)
         r = rig()
         await r.join()
         r.conn.send_gate = asyncio.Event()

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from pyagora.models import IceCandidate
-from pyagora.sdp.candidates import (
+from pyagorartc.models import IceCandidate
+from pyagorartc.sdp.candidates import (
     candidates_to_ortc,
     extract_inline_candidates,
     filter_candidates,

@@ -1,9 +1,9 @@
-# pyagora
+# pyagorartc
 
 Async Python client for Agora RTC signalling, for WebRTC consumers that are
 not the Agora SDK: a browser behind Home Assistant, go2rtc, pion.
 
-A device publishes video to an Agora channel. `pyagora` finds the Agora
+A device publishes video to an Agora channel. `pyagorartc` finds the Agora
 edge, turns the consumer's SDP offer into Agora's ORTC, joins the channel
 over the gateway WebSocket, subscribes to the stream, and hands back an
 answer SDP. Media then flows directly between the consumer and the Agora
@@ -29,7 +29,7 @@ hosts; vendor behaviour plugs in through callbacks and options.
 
 ## Status
 
-Alpha (`0.x`). The API below is the target surface; `pyagora.__all__` is
+Alpha (`0.x`). The API below is the target surface; `pyagorartc.__all__` is
 the supported part of it (Constitution §10). Wire behaviour comes from
 recordings, the Agora Web SDK 4.24.3 and two shipped integrations; what is
 still a guess is listed in [`docs/open_questions.md`](docs/open_questions.md).
@@ -37,7 +37,7 @@ still a guess is listed in [`docs/open_questions.md`](docs/open_questions.md).
 ## Install
 
 ```
-pip install pyagora
+pip install pyagorartc
 ```
 
 Python 3.13+. Dependencies: `aiohttp`, `websockets>=13.1`, `sdp-transform`.
@@ -46,7 +46,7 @@ Python 3.13+. Dependencies: `aiohttp`, `websockets>=13.1`, `sdp-transform`.
 
 ```python
 import aiohttp
-from pyagora import AgoraAPClient, AgoraSession, ChannelCredentials, CloseReason, PyAgoraError, SessionOptions
+from pyagorartc import AgoraAPClient, AgoraSession, ChannelCredentials, CloseReason, PyAgoraRTCError, SessionOptions
 
 
 async def on_closed(reason: CloseReason) -> None:
@@ -69,7 +69,7 @@ async def stream(viewer, creds: ChannelCredentials) -> None:
             answer_sdp = await session.join(offer_sdp, session_id="viewer-1")
             await viewer.set_answer(answer_sdp)
             await viewer.wait_until_done()
-        except PyAgoraError as err:
+        except PyAgoraRTCError as err:
             print("join failed:", err)
         finally:
             await session.close()                          # cancel and await owned tasks, leave, close
@@ -96,7 +96,7 @@ The full table is in [`docs/architecture.md`](docs/architecture.md) §4.
 
 ## Errors
 
-All exceptions derive from `PyAgoraError`. None carries a token, ticket,
+All exceptions derive from `PyAgoraRTCError`. None carries a token, ticket,
 credential or key.
 
 | Exception | Meaning |

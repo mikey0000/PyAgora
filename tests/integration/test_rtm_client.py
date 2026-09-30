@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.exceptions import RtmError
-from pyagora.rtm.client import DEFAULT_ACCEPTED_CODES, RtmRestClient
+from pyagorartc.exceptions import RtmError
+from pyagorartc.rtm.client import DEFAULT_ACCEPTED_CODES, RtmRestClient
 from tests._helpers import RTM_CREDENTIALS, SECRET_VALUES
 from tests.fakegateway._common import LOOPBACK
 from tests.integration._helpers import rtm_headers

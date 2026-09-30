@@ -1,7 +1,7 @@
 # Migration
 
 How each known host stops carrying its own `agora_*` modules and depends on
-`pyagora` instead. Constitution §10 requires this file to be current before
+`pyagorartc` instead. Constitution §10 requires this file to be current before
 any release that changes the public surface.
 
 The hosts today:
@@ -12,7 +12,7 @@ The hosts today:
 | PetKit (`homeassistant_petkit/custom_components/petkit/`) | `agora_api.py`, `agora_sdp.py`, `agora_websocket.py`, `agora_rtm.py`, parts of `webrtc_common.py` and `whep_proxy.py` | `whep_proxy.py::PetkitAgoraUpstreamManager`, `camera.py` |
 
 Names below are the target API (`docs/analysis/divergence.md` §6, with
-`SessionOptions` in `pyagora/models.py` and the RTM client as its tests pin
+`SessionOptions` in `pyagorartc/models.py` and the RTM client as its tests pin
 it). Where that API is still unsettled, this file says so.
 
 ## 1. Common to both hosts
@@ -36,7 +36,7 @@ A session is single-use (architecture §2). A new offer is a new
 
 ### 1.2 ICE servers
 
-`APResponse.get_ice_servers(...)` returns `pyagora.ICEServer`. Home
+`APResponse.get_ice_servers(...)` returns `pyagorartc.ICEServer`. Home
 Assistant wants `webrtc_models.RTCIceServer`. The host converts; the
 library does not import `webrtc_models` (D19).
 
@@ -58,7 +58,7 @@ DETAIL_FIRST` restores PetKit's old order (Q5).
 ### 1.3 Candidates
 
 HA hands the host `webrtc_models.RTCIceCandidateInit`. The session takes
-`pyagora.IceCandidate`.
+`pyagorartc.IceCandidate`.
 
 ```python
 def to_ice_candidate(c: RTCIceCandidateInit) -> IceCandidate:
@@ -81,7 +81,7 @@ Pure helpers replace the hosts' copies:
 ### 1.4 Errors
 
 `join()` never returns `None` and never returns a made-up SDP (D9). Every
-failure is a typed exception under `PyAgoraError` (Constitution §5).
+failure is a typed exception under `PyAgoraRTCError` (Constitution §5).
 
 | Exception | Raised by | Host reaction |
 |---|---|---|
@@ -127,7 +127,7 @@ spawn=lambda coro: hass.async_create_background_task(coro, f"{DOMAIN} agora {dev
 
 ### 1.6 Dependencies
 
-| Package | pyagora needs | Note |
+| Package | pyagorartc needs | Note |
 |---|---|---|
 | `aiohttp` | `>=3.10` | HA provides it. Pass `async_get_clientsession(hass)` to `AgoraAPClient` and `RtmRestClient`; the library never closes a session it did not create (Constitution §4). |
 | `websockets` | `>=13.1` | See below. |
@@ -149,14 +149,14 @@ hosts drop their pins and let HA's constraint decide.
 
 | Today (`custom_components/mammotion/`) | Becomes |
 |---|---|
-| `agora_api.AgoraAPIClient` | `pyagora.AgoraAPClient` |
+| `agora_api.AgoraAPIClient` | `pyagorartc.AgoraAPClient` |
 | `agora_api.AgoraAPIClient.choose_server(app_id=, token=, channel_name=, user_id=, service_flags=)` | `choose_server(creds)`; the default service ids are `(11, 26)` (`const.DEFAULT_SERVICE_IDS`) |
-| `agora_api.AgoraResponse` | `pyagora.APResponse` |
-| `agora_api.SERVICE_IDS` | not needed (defaults); `pyagora.const.SERVICE_GATEWAY` / `SERVICE_TURN` if spelled out |
-| `agora_api.EdgeAddress`, `ICEServer` | `pyagora.EdgeAddress`, `pyagora.ICEServer` |
+| `agora_api.AgoraResponse` | `pyagorartc.APResponse` |
+| `agora_api.SERVICE_IDS` | not needed (defaults); `pyagorartc.const.SERVICE_GATEWAY` / `SERVICE_TURN` if spelled out |
+| `agora_api.EdgeAddress`, `ICEServer` | `pyagorartc.EdgeAddress`, `pyagorartc.ICEServer` |
 | `agora_api.update_ticket`, `get_turn_server_config` (no caller) | `AgoraAPClient.update_ticket`, `APResponse.turn_server_config` (kept, still no caller) |
 | `agora_sdp.parse_offer_to_ortc`, `SDPParser`, `generate_answer_from_ortc` | internal to `AgoraSession` (`sdp.offer_to_ortc`, `sdp.answer_from_ortc`); the dead writer is gone |
-| `agora_websocket.AgoraWebSocketHandler(hass, recover_stream=, keepalive=, target_uid=, session_ended=)` | `pyagora.AgoraSession(creds, ap, options=, on_peer_left=, on_closed=, keepalive=, deadline=, spawn=)`, one per offer |
+| `agora_websocket.AgoraWebSocketHandler(hass, recover_stream=, keepalive=, target_uid=, session_ended=)` | `pyagorartc.AgoraSession(creds, ap, options=, on_peer_left=, on_closed=, keepalive=, deadline=, spawn=)`, one per offer |
 | `handler.connect_and_join(stream_data, offer, session_id, agora_response)` | `await session.join(offer, session_id)` |
 | `handler.candidates.append(c)` / `handler.candidates = []` | `session.add_ice_candidate(to_ice_candidate(c))`; a new session per offer |
 | `handler.disconnect()` | `await session.close()` |
@@ -191,7 +191,7 @@ maps to `ChannelCredentials` (D2):
 ```python
 import base64
 
-from pyagora import ChannelCredentials, ChannelEncryption
+from pyagorartc import ChannelCredentials, ChannelEncryption
 from pymammotion.http.model.camera_stream import StreamSubscriptionResponse
 
 
@@ -229,14 +229,14 @@ Replace the `AgoraAPIClient` block in `async_check_stream_expiry`:
 
 ```python
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from pyagora import AgoraAPClient, PyAgoraError
+from pyagorartc import AgoraAPClient, PyAgoraRTCError
 
 if stream_data is not None and stream_data.data is not None:
     try:
         creds = mammotion_credentials(stream_data.data)
         async with AgoraAPClient(async_get_clientsession(self.hass)) as ap_client:
             ap = await ap_client.choose_server(creds)
-    except PyAgoraError:
+    except PyAgoraRTCError:
         LOGGER.exception("Agora edge discovery failed")
         self.ice_servers = []
     else:
@@ -244,7 +244,7 @@ if stream_data is not None and stream_data.data is not None:
         self._agora_response = ap
 ```
 
-The broad `except Exception` narrows to `PyAgoraError`. The AP call is now
+The broad `except Exception` narrows to `PyAgoraRTCError`. The AP call is now
 TLS-verified (D10); `AgoraAPClient(..., verify_ssl=False)` exists for
 proxied networks.
 
@@ -255,7 +255,7 @@ The entity holds at most one session, created per offer.
 ```python
 import time
 
-from pyagora import AgoraSession, APResponse, CloseReason, IceCandidate, PyAgoraError, SessionOptions
+from pyagorartc import AgoraSession, APResponse, CloseReason, IceCandidate, PyAgoraRTCError, SessionOptions
 
 
 class MammotionWebRTCCamera(MammotionCameraBaseEntity):
@@ -294,7 +294,7 @@ class MammotionWebRTCCamera(MammotionCameraBaseEntity):
         self._session = session
         try:
             answer = await session.join(offer_sdp, session_id)
-        except PyAgoraError as err:
+        except PyAgoraRTCError as err:
             _LOGGER.warning("Agora join failed: %s", err)
             send_message(WebRTCError("500", f"WebRTC negotiation failed: {err}"))
             return False  # the caller's finally closes the session
@@ -335,7 +335,7 @@ same `session.close()`. `_fpv_keepalive` and `_recover_stream` are
 unchanged. `_async_session_ended` becomes `_on_closed`. The
 `websockets.exceptions.WebSocketException` / `json.JSONDecodeError` catch in
 `_async_answer_offer` and the `(OSError, ValueError, TypeError)` catch in
-`_perform_webrtc_negotiation` go: the library raises `PyAgoraError`
+`_perform_webrtc_negotiation` go: the library raises `PyAgoraRTCError`
 subclasses (§1.4). `_perform_webrtc_negotiation` can be inlined.
 
 `token_provider` stays unset: the gateway accepts the join token on renew
@@ -350,7 +350,7 @@ gating it on `is_on_4g` keeps WiFi streams unbounded as they are now.
 
 | Change | Decision | What the host does |
 |---|---|---|
-| A failed join raises; no fabricated answer | D9 | Catch `PyAgoraError`, send `WebRTCError` (§2.4). |
+| A failed join raises; no fabricated answer | D9 | Catch `PyAgoraRTCError`, send `WebRTCError` (§2.4). |
 | TLS verified on the AP call and the gateway socket | D10 | Nothing, unless behind a TLS-intercepting proxy (`verify_ssl=False`). |
 | Browser candidates known before join are sent in the join ORTC | D11 | Nothing. Candidates that arrive later are still not sent. |
 | Join `attributes` nested under `userAttributes`; `enablePreallocPC: true`; `license` sent | D7 | Nothing. First session run confirms the gateway accepts `license`. |
@@ -372,7 +372,7 @@ gating it on `is_on_4g` keeps WiFi streams unbounded as they are now.
 ```json
 "requirements": [
   "pymammotion==0.10.1",
-  "pyagora==x.y.z"
+  "pyagorartc==x.y.z"
 ]
 ```
 
@@ -385,7 +385,7 @@ harmless duplicates.
 
 ### 2.7 Checklist
 
-- [ ] Add `pyagora==x.y.z` to `manifest.json`.
+- [ ] Add `pyagorartc==x.y.z` to `manifest.json`.
 - [ ] Add `mammotion_credentials()` (§2.2) next to the coordinator.
 - [ ] `coordinator.py`: replace the `AgoraAPIClient` block (§2.3); import
       `APResponse` for the `async_check_stream_expiry` return type.
@@ -411,9 +411,9 @@ harmless duplicates.
 
 | Today (`custom_components/petkit/`) | Becomes |
 |---|---|
-| `agora_api.AgoraAPIClient`, `AgoraResponse`, `SERVICE_IDS` | `pyagora.AgoraAPClient`, `pyagora.APResponse`, defaults |
+| `agora_api.AgoraAPIClient`, `AgoraResponse`, `SERVICE_IDS` | `pyagorartc.AgoraAPClient`, `pyagorartc.APResponse`, defaults |
 | `agora_sdp.py` | internal to `AgoraSession` |
-| `agora_websocket.AgoraWebSocketHandler(rtc_token_provider=, prefer_instant_video=, subscribe_retry_delay=, subscribe_retry_attempts=, declare_remote_video_ssrc=, disable_audio_answer=, on_connection_lost=)` | `pyagora.AgoraSession(creds, ap, options=SessionOptions(...), token_provider=, on_closed=, spawn=)` |
+| `agora_websocket.AgoraWebSocketHandler(rtc_token_provider=, prefer_instant_video=, subscribe_retry_delay=, subscribe_retry_attempts=, declare_remote_video_ssrc=, disable_audio_answer=, on_connection_lost=)` | `pyagorartc.AgoraSession(creds, ap, options=SessionOptions(...), token_provider=, on_closed=, spawn=)` |
 | `handler.connect_and_join(live_feed=, offer_sdp=, session_id=, app_id=, agora_response=)` | `await session.join(offer_sdp, session_id)`; `app_id` moves into the credentials |
 | `handler.add_ice_candidate(RTCIceCandidateInit)` / `handler.candidates = ...` | `session.add_ice_candidate(IceCandidate)` |
 | `handler.disconnect()` | `await session.close()` |
@@ -421,7 +421,7 @@ harmless duplicates.
 | `camera._filter_candidates`, `filter_agora_candidates` | `filter_candidates(candidates, turn_ips)` |
 | `whep_proxy._parse_trickle_candidates` | `parse_trickle_fragment(fragment)` |
 | `agora_websocket` fingerprint injection (`get_gateway_addresses() or addresses`) | inside the session, only when the gateway sends none (D26) |
-| `agora_rtm.AgoraRTMSignaling._send_command`, `_iter_endpoints`, `_ensure_session`, `SIGNALING_DOMAINS`, `SIGNALING_PATHS`, `SUCCESS_CODES` | `pyagora.rtm.RtmRestClient.send_peer_message` (D18) |
+| `agora_rtm.AgoraRTMSignaling._send_command`, `_iter_endpoints`, `_ensure_session`, `SIGNALING_DOMAINS`, `SIGNALING_PATHS`, `SUCCESS_CODES` | `pyagorartc.rtm.RtmRestClient.send_peer_message` (D18) |
 | `agora_rtm.AgoraRTMSignaling.start_live`, heartbeat loop, `stop_live`, `send_ptz_ctrl`, `update_tokens` | stays (PetKit vocabulary, D18); rebuilt on `RtmRestClient` (§3.5) |
 | `webrtc_common._resolve_agora_user_id` (unused) | the uid fallback in §3.2 |
 | `webrtc_common._get_live_feed_for_webrtc`, `_missing_live_feed_fields`, `TEMP_CAMERA_TYPES` wake | stays (host glue) |
@@ -449,7 +449,7 @@ that split failed. Today the host then sends JSON `null` as the AP uid.
 `ChannelCredentials.uid` is an `int`, so the host must resolve it or stop.
 
 ```python
-from pyagora import ChannelCredentials, RtmCredentials
+from pyagorartc import ChannelCredentials, RtmCredentials
 
 from .const import AGORA_APP_ID
 
@@ -494,8 +494,8 @@ The AP call is TLS-verified now (D10); PetKit's gateway socket already was.
 `PetkitAgoraUpstreamManager.create_session` becomes:
 
 ```python
-from pyagora import AgoraSession, CloseReason, PyAgoraError, SessionOptions
-from pyagora.rtm import RtmRestClient
+from pyagorartc import AgoraSession, CloseReason, PyAgoraRTCError, SessionOptions
+from pyagorartc.rtm import RtmRestClient
 
 PETKIT_OPTIONS = SessionOptions(
     client_codec="h264",
@@ -544,7 +544,7 @@ async def create_session(self, camera, offer_sdp):
     session_id = secrets.token_hex(16)
     try:
         answer_sdp = await session.join(offer_sdp, session_id)
-    except PyAgoraError:
+    except PyAgoraRTCError:
         await asyncio.gather(session.close(), rtm.stop_live(), return_exceptions=True)
         raise
     # ... store AgoraUpstreamSession(session=session, rtm=rtm, ...) as today ...
@@ -557,7 +557,7 @@ async def create_session(self, camera, offer_sdp):
   offer itself. `filter_candidates` stays a helper for the host's own
   viewer-side filtering.
 - The WHEP view catches `(OSError, RuntimeError, ValueError)`. Add
-  `PyAgoraError` to that tuple, or join failures become HTTP 500 instead
+  `PyAgoraRTCError` to that tuple, or join failures become HTTP 500 instead
   of 502.
 - `close_session` calls `await session.close()` in place of
   `agora_handler.disconnect()`. Calling it from inside `on_closed` is safe:
@@ -626,7 +626,7 @@ async def start_live(self) -> bool:
 | `on_closed` replaces `on_connection_lost`, is async, and also fires for gateway `quit` | D14 | Adapt the callback (§3.4). |
 | `set_client_role` is off by default | D6 | PetKit must pass `send_set_client_role=True` until Q3 is answered. |
 | `on_p2p_lost` is ignored by default | D22 | PetKit passes `end_on_p2p_lost=True` to keep its behaviour (Q13). |
-| A failed join raises | D9 | Catch `PyAgoraError` in the view. |
+| A failed join raises | D9 | Catch `PyAgoraRTCError` in the view. |
 | Subscribe `rtx` follows the gateway's offer instead of always `true`; `on_add_video_stream` no longer requires `video` | D1 | Nothing expected. |
 | `_online_users` cleared on close; one session per offer | D1, architecture §2 | Nothing; `create_session` already replaces the previous session. |
 | AP call TLS-verified; a failed AP block no longer fails discovery | D10, D1 | Nothing. |
@@ -640,12 +640,12 @@ async def start_live(self) -> bool:
   "pypetkitapi==1.29.0",
   "aiofiles==24.1.0",
   "paho-mqtt==2.1.0",
-  "pyagora==x.y.z"
+  "pyagorartc==x.y.z"
 ]
 ```
 
 Drop `websockets==15.0.1` and `sdp-transform==1.1.0`: after the migration
-only pyagora imports them, and it declares both (§1.6). The exact
+only pyagorartc imports them, and it declares both (§1.6). The exact
 `websockets` pin is the one that would fight HA core.
 
 ### 3.8 Checklist
@@ -656,7 +656,7 @@ only pyagora imports them, and it declares both (§1.6). The exact
       (§3.3); delete `_filter_candidates` / `filter_agora_candidates`.
 - [ ] `whep_proxy.py`: rewrite `create_session` (§3.4); `close_session`
       uses `session.close()`; `AgoraUpstreamSession` holds `AgoraSession`;
-      add `PyAgoraError` to the WHEP view's catch.
+      add `PyAgoraRTCError` to the WHEP view's catch.
 - [ ] `whep_proxy.py`: `add_session_candidates` uses
       `parse_trickle_fragment` and does not forward (§3.4); delete
       `_parse_trickle_candidates`.

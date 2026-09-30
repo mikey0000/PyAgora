@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING
 
-from pyagora.const import (
+from pyagorartc.const import (
     KEEPALIVE_INTERVAL_S,
     PEER_RECOVER_COOLDOWN_S,
     PEER_RECOVER_MAX_ATTEMPTS,

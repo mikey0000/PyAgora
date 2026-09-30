@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: ty
         name: ty
-        entry: uv run ty check pyagora/
+        entry: uv run ty check pyagorartc/
         language: system
         pass_filenames: false
         types: [python]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
-from pyagora.ap.password import derive_password
+from pyagorartc.ap.password import derive_password
 
 
 class TestDerivePassword:

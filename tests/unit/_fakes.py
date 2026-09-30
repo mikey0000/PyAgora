@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from types import TracebackType
 
-from pyagora.exceptions import GatewayConnectError
+from pyagorartc.exceptions import GatewayConnectError
 
 __all__ = [
     "FakeGatewayConnection",

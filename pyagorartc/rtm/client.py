@@ -11,15 +11,15 @@ from urllib.parse import quote
 
 import aiohttp
 
-from pyagora.const import RTM_HOSTS, RTM_PEER_MESSAGES_PATH, RTM_TIMEOUT_S
-from pyagora.exceptions import RtmError
-from pyagora.models import fingerprint
+from pyagorartc.const import RTM_HOSTS, RTM_PEER_MESSAGES_PATH, RTM_TIMEOUT_S
+from pyagorartc.exceptions import RtmError
+from pyagorartc.models import fingerprint
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from types import TracebackType
 
-    from pyagora.models import RtmCredentials
+    from pyagorartc.models import RtmCredentials
 
 _LOGGER = logging.getLogger(__name__)
 

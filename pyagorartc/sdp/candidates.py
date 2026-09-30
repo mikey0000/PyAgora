@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from pyagora.models import IceCandidate
+from pyagorartc.models import IceCandidate
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterable

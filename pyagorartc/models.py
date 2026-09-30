@@ -13,7 +13,7 @@ import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING, overload
 
-from pyagora.const import (
+from pyagorartc.const import (
     DEFAULT_AREA_CODE,
     DEFAULT_CLIENT_CODEC,
     DEFAULT_ORTC_DTLS_ROLE,

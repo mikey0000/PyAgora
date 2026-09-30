@@ -19,9 +19,9 @@ test in the wrong directory.
 ## 2. Layout mirrors the package
 
 ```
-pyagora/sdp/answer.py            →  tests/unit/sdp/test_answer.py
-pyagora/ap/response.py           →  tests/unit/ap/test_response.py
-pyagora/session/session.py       →  tests/unit/session/test_session.py
+pyagorartc/sdp/answer.py            →  tests/unit/sdp/test_answer.py
+pyagorartc/ap/response.py           →  tests/unit/ap/test_response.py
+pyagorartc/session/session.py       →  tests/unit/session/test_session.py
 ```
 
 One test module per source module. Split by concern
@@ -127,7 +127,7 @@ A regression test:
 
 ## 8. Coverage and gates
 
-- `pytest --cov=pyagora` must not drop below the number in
+- `pytest --cov=pyagorartc` must not drop below the number in
   `pyproject.toml`. Coverage is a floor, not a target; a line covered by a
   test that asserts nothing is not tested.
 - `tests/meta/test_conventions.py` checks: mirroring, no `unittest.mock`, no

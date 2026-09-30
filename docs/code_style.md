@@ -9,7 +9,7 @@ linter configuration, not the code.
 - Python 3.13 or newer. Use the modern syntax that implies: `type X = ...`
   aliases, PEP 695 generics, `match`, `Self`, `override`.
 - `uv` manages the environment. `uv run ruff check --fix .`,
-  `uv run ruff format .`, `uv run ty check pyagora/`, `uv run pytest`.
+  `uv run ruff format .`, `uv run ty check pyagorartc/`, `uv run pytest`.
 - Line length is 120. Ruff `select = ["ALL"]` with a short, justified ignore
   list; every ignore has a comment saying why.
 
@@ -26,7 +26,7 @@ linter configuration, not the code.
   `GatewayTransport` and `GatewayConnection` are `typing.Protocol`s. Inheritance is for
   shared implementation (`ApiGroup`), not for polymorphism.
 - **Public names are curated.** Each package `__init__.py` re-exports what the
-  layer above needs and nothing else. `pyagora/__init__.py::__all__` is
+  layer above needs and nothing else. `pyagorartc/__init__.py::__all__` is
   the supported surface.
 
 ## Typing

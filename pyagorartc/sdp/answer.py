@@ -10,12 +10,12 @@ from collections.abc import Mapping
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
-from pyagora.exceptions import SdpError
-from pyagora.models import as_int
-from pyagora.sdp.offer import DEFAULT_CLOCK_RATE, KINDS, as_mapping, negotiated_caps, parse_offer
+from pyagorartc.exceptions import SdpError
+from pyagorartc.models import as_int
+from pyagorartc.sdp.offer import DEFAULT_CLOCK_RATE, KINDS, as_mapping, negotiated_caps, parse_offer
 
 if TYPE_CHECKING:
-    from pyagora.models import RemoteStream, SessionOptions
+    from pyagorartc.models import RemoteStream, SessionOptions
 
 _LOGGER = logging.getLogger(__name__)
 

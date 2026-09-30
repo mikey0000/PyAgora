@@ -12,9 +12,9 @@ from urllib.parse import quote, urlsplit
 import aiohttp
 from websockets.asyncio.client import connect
 
-from pyagora.const import EDGE_DOMAIN_SUFFIX
-from pyagora.models import SessionOptions
-from pyagora.session import AgoraSession, WebsocketsTransport
+from pyagorartc.const import EDGE_DOMAIN_SUFFIX
+from pyagorartc.models import SessionOptions
+from pyagorartc.session import AgoraSession, WebsocketsTransport
 from tests._helpers import CREDENTIALS, RTM_CREDENTIALS, load_fixture
 from tests.fakegateway._common import decode
 from tests.unit._fakes import Recorder
@@ -24,9 +24,9 @@ if TYPE_CHECKING:
 
     from websockets.asyncio.client import ClientConnection
 
-    from pyagora.ap import APResponse
-    from pyagora.models import RtmCredentials
-    from pyagora.session import GatewayConnection
+    from pyagorartc.ap import APResponse
+    from pyagorartc.models import RtmCredentials
+    from pyagorartc.session import GatewayConnection
     from tests.fakegateway import FakeAgora
     from tests.unit._fakes import ManualClock
 

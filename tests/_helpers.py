@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pyagora.models import ChannelCredentials, RtmCredentials
+from pyagorartc.models import ChannelCredentials, RtmCredentials
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

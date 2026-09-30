@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from pyagora.exceptions import SdpError
-from pyagora.sdp.offer import can_send, negotiated_caps, offer_to_ortc, parse_offer
+from pyagorartc.exceptions import SdpError
+from pyagorartc.sdp.offer import can_send, negotiated_caps, offer_to_ortc, parse_offer
 from tests._helpers import load_json_fixture
 from tests.unit.sdp._helpers import (
     MID_URI,

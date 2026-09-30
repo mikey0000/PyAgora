@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pyagora.session.messages import (
+from pyagorartc.session.messages import (
     BROWSER_USER_AGENT,
     ErrorInfo,
     FrameType,
@@ -37,9 +37,9 @@ from pyagora.session.messages import (
     parse_rtp_capability_change,
     parse_user_event,
 )
-from pyagora.session.recovery import Keepalive, PeerRecovery, RenewDebounce
-from pyagora.session.session import AgoraSession, Spawn
-from pyagora.session.transport import GatewayConnection, GatewayTransport, WebsocketsConnection, WebsocketsTransport
+from pyagorartc.session.recovery import Keepalive, PeerRecovery, RenewDebounce
+from pyagorartc.session.session import AgoraSession, Spawn
+from pyagorartc.session.transport import GatewayConnection, GatewayTransport, WebsocketsConnection, WebsocketsTransport
 
 __all__ = [
     "BROWSER_USER_AGENT",

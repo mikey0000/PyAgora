@@ -1,5 +1,5 @@
 [project]
-name = "pyagora"
+name = "PyAgoraRTC"
 version = "0.2.0"
 description = "Async Python client for Agora RTC signalling: edge discovery, SDP/ORTC negotiation and the WebSocket gateway session"
 readme = "README.md"
@@ -23,8 +23,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mikey0000/PyAgora"
-Documentation = "https://github.com/mikey0000/PyAgora/tree/main/docs"
+Homepage = "https://github.com/mikey0000/PyAgoraRTC"
+Documentation = "https://github.com/mikey0000/PyAgoraRTC/tree/main/docs"
 
 [dependency-groups]
 dev = [
@@ -43,7 +43,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pyagora"]
+packages = ["pyagorartc"]
 
 [tool.ruff]
 required-version = ">=0.8"
@@ -103,7 +103,7 @@ convention = "google"
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 combine-as-imports = true
-known-first-party = ["pyagora", "tests"]
+known-first-party = ["pyagorartc", "tests"]
 
 [tool.ruff.lint.flake8-type-checking]
 strict = true
@@ -112,7 +112,7 @@ strict = true
 docstring-code-format = true
 
 [tool.ty.src]
-include = ["pyagora"]
+include = ["pyagorartc"]
 exclude = ["tests/**"]
 
 [tool.pytest.ini_options]
@@ -127,7 +127,7 @@ addopts = "-m 'not live' --strict-markers -ra"
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["pyagora"]
+source = ["pyagorartc"]
 branch = true
 
 [tool.coverage.report]

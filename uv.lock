@@ -523,7 +523,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pyagora"
+name = "pyagorartc"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [

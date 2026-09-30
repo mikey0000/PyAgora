@@ -15,7 +15,7 @@ from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import WebSocketException
 from websockets.protocol import State
 
-from pyagora.exceptions import GatewayConnectError
+from pyagorartc.exceptions import GatewayConnectError
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
@@ -68,7 +68,7 @@ _VERIFIED_CONTEXT = _ssl_context(verify=True)
 _UNVERIFIED_CONTEXT = _ssl_context(verify=False)
 _SOCKET_ERRORS = (WebSocketException, OSError)
 # websockets logs every frame at DEBUG, and a renew_token frame is short enough to carry its whole token (§6).
-_WIRE_LOGGER = logging.getLogger("pyagora.session.wire")
+_WIRE_LOGGER = logging.getLogger("pyagorartc.session.wire")
 _WIRE_LOGGER.setLevel(logging.INFO)
 
 

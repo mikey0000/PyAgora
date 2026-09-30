@@ -5,12 +5,12 @@ import logging
 
 import pytest
 
-from pyagora.const import (
+from pyagorartc.const import (
     EDGE_DOMAIN_SUFFIX,
 )
-from pyagora.exceptions import GatewayConnectError, JoinRejectedError, JoinTimeoutError, SdpError, SessionClosedError
-from pyagora.models import CloseReason, IceCandidate, SessionOptions
-from pyagora.sdp import extract_inline_candidates
+from pyagorartc.exceptions import GatewayConnectError, JoinRejectedError, JoinTimeoutError, SdpError, SessionClosedError
+from pyagorartc.models import CloseReason, IceCandidate, SessionOptions
+from pyagorartc.sdp import extract_inline_candidates
 from tests._helpers import CREDENTIALS, RENEWED_TOKEN, RTC_TOKEN, SECRET_VALUES, UID, load_json_fixture
 from tests.unit.session._helpers import (
     OFFER,
@@ -237,7 +237,7 @@ class TestJoinFailure:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The join send was unbounded: a socket that stalled on write hung ``join`` past its own timeout."""
-        monkeypatch.setattr("pyagora.session.session.GATEWAY_SEND_TIMEOUT_S", 0.0)
+        monkeypatch.setattr("pyagorartc.session.session.GATEWAY_SEND_TIMEOUT_S", 0.0)
         r = rig()
         r.conn.send_gate = asyncio.Event()
 

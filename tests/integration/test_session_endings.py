@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from pyagora.exceptions import GatewayConnectError
-from pyagora.models import CloseReason, SessionOptions
+from pyagorartc.exceptions import GatewayConnectError
+from pyagorartc.models import CloseReason, SessionOptions
 from tests.unit._fakes import Recorder
 
 if TYPE_CHECKING:

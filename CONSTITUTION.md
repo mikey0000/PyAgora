@@ -6,7 +6,7 @@ that supersedes the rule, not a quiet exception.
 
 ## 1. Protocol fidelity is traceable
 
-`pyagora` speaks a signalling protocol that Agora has not published for
+`pyagorartc` speaks a signalling protocol that Agora has not published for
 Python. Every behaviour on the wire traces to one of: a recorded exchange
 (`tests/fixtures/`), the documented behaviour of Agora's Web SDK, or a fix
 that carries a regression test. A behaviour that traces to nothing is a guess,
@@ -35,7 +35,7 @@ sdp  ←  ap  ←  session  ←  (host)        rtm  ←  (host)
 HTTP to Agora's access points. `session/` drives one WebSocket gateway
 session and composes the two. `rtm/` is independent of all three. Nothing
 imports upward. The public surface is
-`pyagora.__all__`.
+`pyagorartc.__all__`.
 
 ## 4. All I/O is asynchronous and owned
 
@@ -83,7 +83,7 @@ entry.
 
 ## 10. The public surface is deliberate
 
-`pyagora.__all__` lists the supported API. Anything else may change without
+`pyagorartc.__all__` lists the supported API. Anything else may change without
 notice. Semver; a breaking change to a listed name bumps the major version.
 Both known hosts (Mammotion, PetKit) have a written migration path in
 `docs/migration.md` before a release that changes the surface.

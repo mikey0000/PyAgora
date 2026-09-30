@@ -13,15 +13,15 @@ import logging
 import secrets
 from typing import TYPE_CHECKING, NamedTuple, TypeIs
 
-from pyagora.const import SDK_VERSION
-from pyagora.exceptions import JoinRejectedError
-from pyagora.models import RemoteStream, as_int
-from pyagora.sdp import offers_rtx
+from pyagorartc.const import SDK_VERSION
+from pyagorartc.exceptions import JoinRejectedError
+from pyagorartc.models import RemoteStream, as_int
+from pyagorartc.sdp import offers_rtx
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from pyagora.models import ChannelCredentials, SessionOptions
+    from pyagorartc.models import ChannelCredentials, SessionOptions
 
 _LOGGER = logging.getLogger(__name__)
 

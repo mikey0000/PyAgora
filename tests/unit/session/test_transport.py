@@ -4,7 +4,7 @@ import ssl
 
 import pytest
 
-from pyagora.session.transport import ssl_for
+from pyagorartc.session.transport import ssl_for
 
 
 class TestSslFor:

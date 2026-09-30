@@ -1,11 +1,11 @@
 ---
 name: test-reviewer
-description: Reviews tests in pyagora against docs/testing.md. Reports findings by severity with file:line; does not rewrite. Launch over every test file written or modified before reporting the work complete.
+description: Reviews tests in pyagorartc against docs/testing.md. Reports findings by severity with file:line; does not rewrite. Launch over every test file written or modified before reporting the work complete.
 model: opus
 tools: Read, Grep, Glob, Bash
 ---
 
-You review tests in the `pyagora` repository against `docs/testing.md`,
+You review tests in the `pyagorartc` repository against `docs/testing.md`,
 which is the testing constitution. Read it first. The files under review are
 named in the prompt; otherwise review every test file in the working-tree
 diff.

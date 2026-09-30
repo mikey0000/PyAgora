@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pyagora.const import SDK_VERSION
-from pyagora.exceptions import JoinRejectedError
-from pyagora.models import ChannelEncryption, RemoteStream, SessionOptions
-from pyagora.sdp import offers_rtx
-from pyagora.session.messages import (
+from pyagorartc.const import SDK_VERSION
+from pyagorartc.exceptions import JoinRejectedError
+from pyagorartc.models import ChannelEncryption, RemoteStream, SessionOptions
+from pyagorartc.sdp import offers_rtx
+from pyagorartc.session.messages import (
     BROWSER_USER_AGENT,
     FrameType,
     JoinResult,
@@ -43,8 +43,8 @@ from pyagora.session.messages import (
 from tests._helpers import CREDENTIALS, ENCRYPTION_SECRET, load_fixture, load_json_fixture
 
 if TYPE_CHECKING:
-    from pyagora.models import ChannelCredentials
-    from pyagora.session.messages import GatewayFrame
+    from pyagorartc.models import ChannelCredentials
+    from pyagorartc.session.messages import GatewayFrame
 
 STREAM = RemoteStream(uid=1, ssrc=44444444)
 
@@ -142,7 +142,7 @@ class TestBuildJoin:
         """D20/Q17: the SDK sends the secret RSA-wrapped, so a raw ``aes_secret`` is never put on the wire."""
         encryption = ChannelEncryption(mode="aes-256-gcm2", secret=ENCRYPTION_SECRET, salt=salt)
 
-        with caplog.at_level(logging.DEBUG, logger="pyagora.session"):
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.session"):
             frame = join_frame(dataclasses.replace(credentials, encryption=encryption))
 
         assert canonical(frame) == canonical(load_json_fixture("gateway/join_v3_expected.json"))
@@ -153,7 +153,7 @@ class TestBuildJoin:
     def test_logs_no_warning_without_encryption(
         self, credentials: ChannelCredentials, caplog: pytest.LogCaptureFixture
     ) -> None:
-        with caplog.at_level(logging.DEBUG, logger="pyagora.session"):
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.session"):
             join_frame(credentials)
 
         assert not [r for r in caplog.records if r.levelno >= logging.WARNING]

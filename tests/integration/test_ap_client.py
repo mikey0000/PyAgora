@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.ap.client import AgoraAPClient, build_request_payload
-from pyagora.ap.password import derive_password
-from pyagora.const import (
+from pyagorartc.ap.client import AgoraAPClient, build_request_payload
+from pyagorartc.ap.password import derive_password
+from pyagorartc.const import (
     AP_FLAG_GATEWAY,
     AP_URI_CHOOSE_SERVER,
     AP_URI_UPDATE_TICKET,
@@ -19,8 +19,8 @@ from pyagora.const import (
     TURN_PORT,
     TURNS_PORT,
 )
-from pyagora.exceptions import APError
-from pyagora.models import TurnCredentialStrategy
+from pyagorartc.exceptions import APError
+from pyagorartc.models import TurnCredentialStrategy
 from tests._helpers import CREDENTIALS, SECRET_VALUES, TICKET
 from tests.fakegateway._common import (
     CID,
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     import aiohttp
 
-    from pyagora.ap.response import APResponse
+    from pyagorartc.ap.response import APResponse
     from tests.fakegateway import FakeAgora
     from tests.unit._fakes import ManualClock
 

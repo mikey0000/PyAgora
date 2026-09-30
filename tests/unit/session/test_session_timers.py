@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.const import (
+from pyagorartc.const import (
     KEEPALIVE_INTERVAL_S,
     PING_INTERVAL_S,
     RENEW_TOKEN_DEBOUNCE_S,
 )
-from pyagora.exceptions import SessionClosedError
-from pyagora.models import CloseReason, fingerprint
+from pyagorartc.exceptions import SessionClosedError
+from pyagorartc.models import CloseReason, fingerprint
 from tests._helpers import RENEWED_TOKEN, RTC_TOKEN, load_json_fixture
 from tests.unit.session._helpers import (
     MARKER_UID,

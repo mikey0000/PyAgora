@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from pyagora.const import KEEPALIVE_INTERVAL_S, PING_INTERVAL_S, RENEW_TOKEN_DEBOUNCE_S
-from pyagora.models import CloseReason
+from pyagorartc.const import KEEPALIVE_INTERVAL_S, PING_INTERVAL_S, RENEW_TOKEN_DEBOUNCE_S
+from pyagorartc.models import CloseReason
 from tests._helpers import RENEWED_TOKEN, RTC_TOKEN
 from tests.fakegateway.gateway import WILL_EXPIRE_INTERVAL_S
 from tests.integration._helpers import SESSION_TIMEOUT_S

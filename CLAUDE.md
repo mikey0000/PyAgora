@@ -5,7 +5,7 @@ it is short and it is binding.
 
 ## What this is
 
-`pyagora`: an async Python client for Agora RTC signalling, reverse-engineered
+`pyagorartc`: an async Python client for Agora RTC signalling, reverse-engineered
 from Agora's Web SDK and hardened by two Home Assistant integrations
 (Mammotion mowers, PetKit cameras). It is host-agnostic: no Home Assistant, no
 vendor library, no vendor behaviour except through documented extension
@@ -16,7 +16,7 @@ points.
 ```bash
 uv sync
 uv run ruff check --fix . && uv run ruff format .
-uv run ty check pyagora/
+uv run ty check pyagorartc/
 uv run pytest                      # all tiers except live
 uv run pytest tests/unit           # fast tier
 uv run pre-commit run --all-files
@@ -41,7 +41,7 @@ uv run pre-commit run --all-files
   (`architecture.md` §3). Extend the existing site.
 - **Traceability.** A change to what goes on the wire cites its source
   (fixture, SDK behaviour, or a regression test that was red).
-- **No host or vendor imports** anywhere under `pyagora/`. The meta tests
+- **No host or vendor imports** anywhere under `pyagorartc/`. The meta tests
   enforce it.
 - **Tests before merge, in the right tier.** Regression tests are seen red
   first and marked `regression`. Launch `test-reviewer` over any test file you

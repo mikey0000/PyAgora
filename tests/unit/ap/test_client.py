@@ -7,17 +7,17 @@ from typing import TYPE_CHECKING, Any
 import aiohttp
 import pytest
 
-from pyagora.ap.client import AgoraAPClient, build_request_payload, encode_request
-from pyagora.const import AP_HOSTS, AP_PATH, AP_URI_CHOOSE_SERVER, AP_URI_UPDATE_TICKET
-from pyagora.exceptions import APError, APRejectedError
-from pyagora.models import EdgeAddress
+from pyagorartc.ap.client import AgoraAPClient, build_request_payload, encode_request
+from pyagorartc.const import AP_HOSTS, AP_PATH, AP_URI_CHOOSE_SERVER, AP_URI_UPDATE_TICKET
+from pyagorartc.exceptions import APError, APRejectedError
+from pyagorartc.models import EdgeAddress
 from tests._helpers import CREDENTIALS, RTC_TOKEN, load_fixture, load_json_fixture
 from tests.unit._fakes import FakeMisuseError, RecordingHttpSession
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pyagora.models import ChannelCredentials
+    from pyagorartc.models import ChannelCredentials
 
 HOSTS = ("https://ap-1.test", "https://ap-2.test", "https://ap-3.test")
 FIXED_NOW = 1790716794.25

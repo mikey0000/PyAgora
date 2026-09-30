@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pyagora.const import EDGE_DOMAIN_SUFFIX
-from pyagora.exceptions import JoinRejectedError, JoinTimeoutError
-from pyagora.models import CloseReason, SessionOptions
-from pyagora.sdp import extract_inline_candidates
+from pyagorartc.const import EDGE_DOMAIN_SUFFIX
+from pyagorartc.exceptions import JoinRejectedError, JoinTimeoutError
+from pyagorartc.models import CloseReason, SessionOptions
+from pyagorartc.sdp import extract_inline_candidates
 from tests._helpers import RTC_TOKEN
 from tests.fakegateway._common import SERVER_ICE_UFRAG, dtls_fingerprint
 from tests.integration._helpers import CHROME_OFFER, GO2RTC_OFFER, SESSION_ID, SESSION_TIMEOUT_S

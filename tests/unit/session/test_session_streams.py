@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from pyagora.const import (
+from pyagorartc.const import (
     DECLARED_SSRC_TIMEOUT_S,
 )
-from pyagora.models import RemoteStream, SessionOptions
+from pyagorartc.models import RemoteStream, SessionOptions
 from tests._helpers import UID, load_json_fixture
 from tests.unit.session._helpers import (
     ASSIGNED_UID,

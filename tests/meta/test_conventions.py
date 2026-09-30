@@ -159,7 +159,7 @@ class TestMirroring:
     """testing.md §2: "One test module per source module", laid out to mirror the package."""
 
     def test_every_source_module_has_a_unit_test_module(self) -> None:
-        """§2: ``pyagora/<dir>/<mod>.py`` → ``tests/unit/<dir>/test_<mod>.py`` (``models.py`` → ``test_models.py``)."""
+        """§2: ``pyagorartc/<dir>/<mod>.py`` → ``tests/unit/<dir>/test_<mod>.py`` (``models.py`` → ``test_models.py``)."""
         missing = []
         for path in _source_modules():
             relative = path.relative_to(PACKAGE_DIR)
@@ -172,7 +172,7 @@ class TestMirroring:
         assert not missing, report("Source modules without a mirrored unit-test module", missing)
 
     def test_every_unit_test_module_names_an_existing_source_module(self) -> None:
-        """§2: a ``tests/unit/**/test_<mod>[_<concern>].py`` must pin a real ``pyagora`` module."""
+        """§2: a ``tests/unit/**/test_<mod>[_<concern>].py`` must pin a real ``pyagorartc`` module."""
         orphans = []
         for path in _unit_test_files():
             if not path.stem.startswith("test_"):
@@ -484,7 +484,7 @@ def _fixture_files() -> list[Path]:
 
 
 class TestNoRealHostsOrSecrets:
-    """testing.md §5: "Fixture credentials are obviously fake"; hosts come from ``pyagora.const``."""
+    """testing.md §5: "Fixture credentials are obviously fake"; hosts come from ``pyagorartc.const``."""
 
     def test_no_test_literal_names_a_real_host_or_looks_like_a_secret(self) -> None:
         """§5 and §8 ("no real hostnames in tests"): no Agora host, no JWT, no long base64/hex run.
@@ -674,36 +674,36 @@ class TestLayerDirection:
     @pytest.mark.parametrize(
         ("importer", "module", "allowed"),
         [
-            ("const.py", "pyagora.models", False),
-            ("exceptions.py", "pyagora.models", False),
-            ("models.py", "pyagora.exceptions", True),
-            ("models.py", "pyagora.sdp", False),
-            ("sdp/offer.py", "pyagora.models", True),
-            ("sdp/offer.py", "pyagora.exceptions", True),
-            ("sdp/offer.py", "pyagora.sdp.candidates", True),
-            ("sdp/offer.py", "pyagora.const", True),
-            ("sdp/offer.py", "pyagora.ap.response", False),
-            ("sdp/offer.py", "pyagora.session.messages", False),
+            ("const.py", "pyagorartc.models", False),
+            ("exceptions.py", "pyagorartc.models", False),
+            ("models.py", "pyagorartc.exceptions", True),
+            ("models.py", "pyagorartc.sdp", False),
+            ("sdp/offer.py", "pyagorartc.models", True),
+            ("sdp/offer.py", "pyagorartc.exceptions", True),
+            ("sdp/offer.py", "pyagorartc.sdp.candidates", True),
+            ("sdp/offer.py", "pyagorartc.const", True),
+            ("sdp/offer.py", "pyagorartc.ap.response", False),
+            ("sdp/offer.py", "pyagorartc.session.messages", False),
             ("sdp/offer.py", "sdp_transform", True),
             ("sdp/offer.py", "collections.abc", True),
             ("sdp/offer.py", "aiohttp", False),
             ("sdp/answer.py", "websockets.asyncio.client", False),
-            ("ap/client.py", "pyagora.const", True),
+            ("ap/client.py", "pyagorartc.const", True),
             ("ap/client.py", "aiohttp", True),
-            ("ap/client.py", "pyagora.sdp", False),
-            ("ap/client.py", "pyagora.rtm.client", False),
-            ("ap/client.py", "pyagora.session.transport", False),
-            ("rtm/client.py", "pyagora.models", True),
-            ("rtm/client.py", "pyagora.ap.response", False),
-            ("rtm/client.py", "pyagora.session", False),
-            ("session/session.py", "pyagora.sdp.offer", True),
-            ("session/session.py", "pyagora.ap.response", True),
-            ("session/session.py", "pyagora.const", True),
-            ("session/session.py", "pyagora.rtm.client", False),
+            ("ap/client.py", "pyagorartc.sdp", False),
+            ("ap/client.py", "pyagorartc.rtm.client", False),
+            ("ap/client.py", "pyagorartc.session.transport", False),
+            ("rtm/client.py", "pyagorartc.models", True),
+            ("rtm/client.py", "pyagorartc.ap.response", False),
+            ("rtm/client.py", "pyagorartc.session", False),
+            ("session/session.py", "pyagorartc.sdp.offer", True),
+            ("session/session.py", "pyagorartc.ap.response", True),
+            ("session/session.py", "pyagorartc.const", True),
+            ("session/session.py", "pyagorartc.rtm.client", False),
             ("session/transport.py", "websockets.asyncio.client", True),
-            ("session/session.py", "pyagora", False),
-            ("models.py", "pyagora", False),
-            ("__init__.py", "pyagora.session.session", True),
+            ("session/session.py", "pyagorartc", False),
+            ("models.py", "pyagorartc", False),
+            ("__init__.py", "pyagorartc.session.session", True),
             ("session/session.py", "webrtc_models", False),
             ("__init__.py", "homeassistant.core", False),
             ("ap/client.py", "pypetkitapi.client", False),
@@ -720,11 +720,11 @@ class TestLayerDirection:
     @pytest.mark.parametrize(
         ("source", "flagged"),
         [
-            ("if TYPE_CHECKING:\n    from pyagora.session import transport", True),
-            ("from pyagora.session import GatewayTransport", True),
+            ("if TYPE_CHECKING:\n    from pyagorartc.session import transport", True),
+            ("from pyagorartc.session import GatewayTransport", True),
             ("from ..session import transport", True),
-            ("from pyagora import ChannelCredentials", True),
-            ("from pyagora import models", False),
+            ("from pyagorartc import ChannelCredentials", True),
+            ("from pyagorartc import models", False),
             ("from ..models import IceCandidate", False),
             ("from .response import APResponse", False),
         ],
@@ -766,7 +766,7 @@ class TestTopLevelImportsOnly:
 
 
 class TestPublicSurface:
-    """Constitution §10: "``pyagora.__all__`` lists the supported API"."""
+    """Constitution §10: "``pyagorartc.__all__`` lists the supported API"."""
 
     def test_every_listed_name_is_importable_from_the_package(self) -> None:
         """§10: a name in ``__all__`` that the package cannot hand out is a broken promise."""

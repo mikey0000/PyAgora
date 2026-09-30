@@ -7,10 +7,10 @@ from typing import Any
 import pytest
 from sdp_transform import parse as sdp_parse
 
-from pyagora.exceptions import SdpError
-from pyagora.models import RemoteStream, SessionOptions
-from pyagora.sdp.answer import STRIPPED_EXTENSIONS, answer_from_ortc, offers_rtx, setup_for_role, validate_answer
-from pyagora.sdp.offer import offer_to_ortc
+from pyagorartc.exceptions import SdpError
+from pyagorartc.models import RemoteStream, SessionOptions
+from pyagorartc.sdp.answer import STRIPPED_EXTENSIONS, answer_from_ortc, offers_rtx, setup_for_role, validate_answer
+from pyagorartc.sdp.offer import offer_to_ortc
 from tests.unit.sdp._helpers import (
     MID_URI,
     chrome_answer,
@@ -306,7 +306,7 @@ class TestMalformedGatewayOrtc:
         gateway = gateway_ortc()
         gateway["dtlsParameters"]["fingerprints"].insert(0, "junk")
 
-        with caplog.at_level(logging.DEBUG, logger="pyagora.sdp"):
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.sdp"):
             answer = answer_from_ortc(gateway, chrome_offer(), options=DEFAULTS)
 
         assert "a=fingerprint:sha-256 BD:3E:08" in section_lines(answer, "0")
@@ -357,7 +357,7 @@ class TestMalformedGatewayOrtc:
         gateway = gateway_ortc()
         gateway["rtpCapabilities"]["sendrecv"]["videoCodecs"][0]["rtcpFeedbacks"].insert(0, feedback)
 
-        with caplog.at_level(logging.DEBUG, logger="pyagora.sdp"):
+        with caplog.at_level(logging.DEBUG, logger="pyagorartc.sdp"):
             answer = answer_from_ortc(gateway, chrome_offer(), options=DEFAULTS)
 
         assert [line for line in section_lines(answer, "1") if line.startswith("a=rtcp-fb:")] == [

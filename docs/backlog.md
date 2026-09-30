@@ -31,7 +31,7 @@ Open work only; finished items are deleted.
 
 ## Hosts
 
-- HA-Luba: replace `custom_components/mammotion/agora_*.py` with `pyagora`
+- HA-Luba: replace `custom_components/mammotion/agora_*.py` with `pyagorartc`
   per `docs/migration.md`; keep its six Agora tests as library tests (done
   here) and delete the local copies.
 - PetKit: migration per `docs/migration.md`; the `set_client_role` question

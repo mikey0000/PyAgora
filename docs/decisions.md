@@ -3,7 +3,7 @@
 Numbered, append-only once released. Until the first release an entry may
 be amended in place; after that a decision is superseded by a later entry,
 never edited away. Where a decision resolves a conflict between the three prior
-copies of this code (PyAgora snapshot, HA-Luba/Mammotion, PetKit), the
+copies of this code (PyAgoraRTC snapshot, HA-Luba/Mammotion, PetKit), the
 analysis behind it is `docs/analysis/divergence.md`.
 
 ## D1. HA-Luba is the behavioural base; PetKit fixes are ported; its regressions are not
@@ -236,6 +236,6 @@ asks whether the gateway ever omits its fingerprint.
 websockets logs every frame at DEBUG, truncated to its first and last few
 dozen characters, so a `renew_token` frame is logged whole, token included
 (Constitution §6). `WebsocketsTransport` passes it the logger
-`pyagora.session.wire`, set to INFO. A host that needs the frames can set
+`pyagorartc.session.wire`, set to INFO. A host that needs the frames can set
 that logger to DEBUG on purpose; the session's own frame lines go through
 `describe_frame` and carry no values.

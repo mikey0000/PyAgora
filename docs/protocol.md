@@ -455,7 +455,7 @@ and SDK:31050-31052, 44221-44256.
   |---|---|---|
   | `server` | `passive` | SDK:44242-44251, `agora_websocket.py:1538-1539` |
   | `client` | `active` | same |
-  | `auto` | `actpass` (SDK); `pyagora` answers `active` (RFC 5763 §5, D5) | same |
+  | `auto` | `actpass` (SDK); `pyagorartc` answers `active` (RFC 5763 §5, D5) | same |
 
   Agora reports `"client"` in practice (commit `8cc8a51`, `test_agora_answer_sdp.py:117`).
 - **Where the codecs sit.** `rtpCapabilities` may hold its codecs under `sendrecv`, `recv`, `send`, or flat at
@@ -586,7 +586,7 @@ PetKit sends `codec: "h264"` and `rtx` as given (`petkit/agora_websocket.py:531-
   500 ms after video starts. Joining with `role: "host"` in `join_v3` is enough (project memory
   `project_agora_webrtc_fixes.md` §3; `agora_test.html:1605` has it commented out).
 - **PetKit does send it,** straight after join success (`petkit/agora_websocket.py:354`).
-- **Implication for `pyagora`:** role changes need a per-vendor switch.
+- **Implication for `pyagorartc`:** role changes need a per-vendor switch.
 
 ---
 
@@ -977,7 +977,7 @@ Response, current shape (CAPTURED, `HA-Luba/config/home-assistant.log:433-434`, 
 - **Web `join_v3` encryption fields (SDK, unverified on the wire).** The SDK sends `aes_mode`, `aes_secret` and
   `aes_salt` in `join_v3`, but `aes_secret` is not the key: it is `base64(RSA-OAEP-SHA256(embedded SPKI key,
   secret))`, with `aes_encrypt: true` behind a feature flag (`agoraRTC_N-4.24.3.js:63522-63558`, `:46356-46362`).
-  The SDK error `ILLEGAL_AES_PASSWORD` (2028) is the gateway's answer to a bad one. `pyagora` sends none of these
+  The SDK error `ILLEGAL_AES_PASSWORD` (2028) is the gateway's answer to a bad one. `pyagorartc` sends none of these
   fields and logs a WARNING when `ChannelCredentials.encryption` is set (D20, Q17).
 
 Response, older shape (CAPTURED, `HA-Luba/untitled`, a Python repr dump, redacted). It has **no `openEncrypt`,
@@ -1091,7 +1091,7 @@ Response (shape inferred from the parser at `agora_rtm.py:291-304`; no capture):
    UDP/TCP URLs use port 3478, not the AP's 443. The TLS URL is `turns:{a-b-c-d}.edge.agora.io:443?transport=tcp`.
    The gateway TURN port is the gateway port + 30, with the token as password.
 3. **Gateway fingerprints.** `detail["19"]` is `;`-separated and matched to `edges_services` by index. Both hosts
-   merged them into the join response's `dtlsParameters.fingerprints`, deduplicated case-insensitively; `pyagora`
+   merged them into the join response's `dtlsParameters.fingerprints`, deduplicated case-insensitively; `pyagorartc`
    uses the connected edge's only when the gateway sends none (D26).
 4. **Envelope correlation.** A frame with `_id` is a response and has `_result`; a frame without `_id` is an
    event. `_id` is 6 characters. On failure the code is in `_message.error_code`, falling back to

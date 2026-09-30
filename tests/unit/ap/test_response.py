@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from pyagora.ap.password import derive_password
-from pyagora.ap.response import APResponse, fingerprints_from_edge
-from pyagora.exceptions import APError, APRejectedError
-from pyagora.models import EdgeAddress, TurnCredentialStrategy, TurnMode
+from pyagorartc.ap.password import derive_password
+from pyagorartc.ap.response import APResponse, fingerprints_from_edge
+from pyagorartc.exceptions import APError, APRejectedError
+from pyagorartc.models import EdgeAddress, TurnCredentialStrategy, TurnMode
 from tests._helpers import RTC_TOKEN, load_json_fixture
 
 if TYPE_CHECKING:
-    from pyagora.models import ICEServer
+    from pyagorartc.models import ICEServer
 
 GATEWAY = 4096
 TURN = 4194310

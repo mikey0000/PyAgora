@@ -14,8 +14,8 @@ from typing import Any, NotRequired, TypedDict
 
 from sdp_transform import parse as sdp_parse
 
-from pyagora.const import DEFAULT_ORTC_DTLS_ROLE
-from pyagora.exceptions import SdpError
+from pyagorartc.const import DEFAULT_ORTC_DTLS_ROLE
+from pyagorartc.exceptions import SdpError
 
 _LOGGER = logging.getLogger(__name__)
 
