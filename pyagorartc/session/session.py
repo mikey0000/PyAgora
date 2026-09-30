@@ -124,6 +124,7 @@ class AgoraSession:
         self._reader_stopped = False
         self._join_started = False
         self._joined = False
+        self._pending_end: CloseReason | None = None
         self._own_uid = creds.uid
         self._token = creds.token
         self._rtx = False
@@ -193,8 +194,9 @@ class AgoraSession:
             JoinTimeoutError: No join result within ``options.join_timeout_s``.
             SdpError: The offer or the gateway ORTC could not be translated.
 
-        On any failure the socket is closed, owned tasks are cancelled and ``on_closed(JOIN_FAILED)`` fires
-        before the exception propagates (D9, D23).
+        On any failure the socket is closed, owned tasks are cancelled and ``on_closed`` fires before the
+        exception propagates: ``JOIN_FAILED``, or ``GATEWAY_QUIT`` / ``P2P_LOST`` when the gateway ended the
+        session before ``join`` finished, which raises ``GatewayConnectError`` (D9, D23, D29).
 
         """
         if self._join_started or self._close_reason is not None:
@@ -203,7 +205,7 @@ class AgoraSession:
         try:
             return await self._join(offer_sdp, session_id)
         except BaseException:
-            await self._end(CloseReason.JOIN_FAILED)
+            await self._end(self._pending_end or CloseReason.JOIN_FAILED)
             raise
 
     async def renew_token(self, token: str | None = None) -> None:
@@ -274,6 +276,9 @@ class AgoraSession:
             self._join_waiter = None
             timer.cancel()
         join = parse_join_result(frame)
+        if self._pending_end is not None:
+            # Checked first: the gateway usually closes the socket right after the quit it announced.
+            raise GatewayConnectError(f"gateway ended the session during join ({self._pending_end.value})")
         if self._reader_stopped:
             # The result arrived, but the message loop stopped before this task resumed to act on it.
             raise GatewayConnectError("gateway socket closed before the join completed")
@@ -486,8 +491,7 @@ class AgoraSession:
             notification.code,
             notification.detail,
         )
-        if self._joined:
-            await self._end(CloseReason.GATEWAY_QUIT)
+        await self._end_by_gateway(CloseReason.GATEWAY_QUIT)
 
     async def _on_p2p_lost(self, frame: GatewayFrame) -> None:
         lost = parse_p2p_lost(frame)
@@ -496,8 +500,16 @@ class AgoraSession:
             _LOGGER.debug("Gateway reported p2p_lost (code %s, %s); ignored", lost.code, lost.error)
             return
         _LOGGER.warning("Gateway reported p2p_lost (code %s, %s); ending the session", lost.code, lost.error)
+        await self._end_by_gateway(CloseReason.P2P_LOST)
+
+    async def _end_by_gateway(self, reason: CloseReason) -> None:
+        """End a joined session; while ``join`` is in flight, leave the ending for ``join`` to apply (D29)."""
         if self._joined:
-            await self._end(CloseReason.P2P_LOST)
+            await self._end(reason)
+            return
+        self._pending_end = self._pending_end or reason
+        if (waiter := self._join_waiter) is not None and not waiter.done():
+            waiter.set_exception(GatewayConnectError(f"gateway ended the session during join ({reason.value})"))
 
     async def _on_p2p_ok(self, frame: GatewayFrame) -> None:
         ok = parse_p2p_ok(frame.message)

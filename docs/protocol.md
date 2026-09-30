@@ -659,6 +659,11 @@ Negative case from the same test:
 
 - **Mammotion uid sharing.** Every Mammotion stream token shares one viewer uid. A second camera joining the same
   uid while the first is established gets the first one quit with code 2003.
+- **Timing against the join result.** The fake gateway, and the HA log that prompted D29, deliver the older
+  session's quit right after its own join result, often in the same read. A client must treat a quit that arrives
+  before it has acted on its join result as ending that join, not drop it for "not joined yet". The timing is from
+  a real HA DEBUG log (quit at 11:52:58.467, answer built 8 ms later, no ending reported); the frames themselves
+  were not logged.
 - **How the SDK handles it** (`handleNotification`, SDK:31150-31198): it maps `code` through the table below.
   - Code 28 with `detail` is a recover notification.
   - Code 30 is `K_VOS_FALLBACK`, whose `detail` is `"FALLBACKCN"` or `"fallback_hls"`.

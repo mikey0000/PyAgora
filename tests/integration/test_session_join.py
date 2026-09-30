@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pyagorartc.const import EDGE_DOMAIN_SUFFIX
-from pyagorartc.exceptions import JoinRejectedError, JoinTimeoutError
+from pyagorartc.exceptions import GatewayConnectError, JoinRejectedError, JoinTimeoutError
 from pyagorartc.models import CloseReason, SessionOptions
 from pyagorartc.sdp import extract_inline_candidates
 from tests._helpers import RTC_TOKEN
@@ -165,3 +165,24 @@ class TestJoinFailure:
         with pytest.raises(JoinTimeoutError):
             await asyncio.wait_for(join, SESSION_TIMEOUT_S)
         assert r.closed.calls == [CloseReason.JOIN_FAILED]
+
+    @pytest.mark.regression
+    async def test_a_repeat_join_landing_with_the_first_result_fails_the_first_join_as_a_gateway_quit(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        """The 2003 quit reaching the first session with its join result was dropped; its ``join`` then answered."""
+        fake_agora.control(join_delay_s=5.0)
+        first, second = new_session(), new_session()
+        first_join = asyncio.ensure_future(first.session.join(CHROME_OFFER, SESSION_ID))
+        second_join = asyncio.ensure_future(second.session.join(CHROME_OFFER, SESSION_ID))
+        # Each session's join timer and the fake's two held join results.
+        await first.sleepers(4)
+
+        # Both held results fall due together: the first socket gets its result, then the second join's 2003.
+        await first.advance(5.0)
+
+        with pytest.raises(GatewayConnectError):
+            await asyncio.wait_for(first_join, SESSION_TIMEOUT_S)
+        await asyncio.wait_for(second_join, SESSION_TIMEOUT_S)
+        assert first.closed.calls == [CloseReason.GATEWAY_QUIT]
+        assert (second.closed.calls, second.session.is_joined) == ([], True)

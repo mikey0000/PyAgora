@@ -191,7 +191,7 @@ socket and tasks and fires `on_closed(JOIN_FAILED)` before raising (a socket
 that closes after the join result but before `join()` acts on it is a failed
 join, `GatewayConnectError`, not a silently dead joined session); the
 gateway's quit, a socket close, the deadline and (with D22) `p2p_lost` fire
-their reasons. `close()` is idempotent and safe after a failed join. A
+their reasons, including when they land while `join()` is in flight (D29). `close()` is idempotent and safe after a failed join. A
 candidate added after `join()` is ignored with a DEBUG line (Q4).
 
 ## D24. `parse_offer` restores what `sdp_transform` coerces (amends D3)
@@ -250,3 +250,21 @@ defaults to `True`, preserving the Mammotion rule; PetKit passes `False`,
 which counts the announced uid as present so `on_user_offline` still tears
 the subscription down. A held stream logs its uid at DEBUG. Q18 decides the
 eventual default.
+
+## D29. A quit or `p2p_lost` during `join()` fails the join with its own reason (amends D23)
+
+The gateway sends the older session's 2003 quit when a second join on the
+same uid lands, which can be right behind the older session's own join
+result: the reader dispatches both before `join()` resumes. The handlers
+used to act only on a joined session, so the quit was dropped and `join()`
+answered for a session the gateway had already quit (a frozen feed in HA).
+A quit, or `p2p_lost` with `end_on_p2p_lost`, that arrives before `join()`
+has marked the session joined is recorded; `join()` then raises
+`GatewayConnectError` and `on_closed` fires once with `GATEWAY_QUIT` /
+`P2P_LOST`, not `JOIN_FAILED`: the join succeeded at the gateway and the
+reason is what the host acts on. It is checked ahead of the socket-close
+race, since the gateway closes the socket after the quit. One that arrives
+before the result fails the join at once instead of waiting out the
+timeout. `GatewayConnectError`, not `JoinRejectedError`: the join result was
+a success, and `JoinRejectedError` carries a join-result code the gateway
+never sent; this is the same shape as the socket-close race.
