@@ -122,10 +122,17 @@ when the real shape differs, the fake changes first (testing.md §6).
 ## Q18. Does `on_user_online` always accompany `on_add_video_stream`?
 
 The session subscribes once both have been seen (the Mammotion rule;
-protocol §3.2). PetKit's copy subscribed on the stream announcement alone.
-If a PetKit gateway announces the stream without a preceding presence event,
-no subscribe is sent. Closes with a PetKit gateway capture; if needed an
-option relaxes the gate.
+protocol §3.2); publishers found in the join payload count as online.
+PetKit's copy never depended on the event: it subscribed on
+`on_add_video_stream` alone and on the join-payload walk, and its
+`on_user_online` handler recorded a uid nothing read
+(`agora_websocket.py:433-470`, `:555-566`). Nothing on record shows whether a
+PetKit gateway sends it. The risk is real for PetKit's usual order: RTM
+`start_live` goes out just before the join, so the camera likely starts
+publishing after we joined, and that stream is subscribed only if
+`on_user_online` also arrives. Today: gated. Closes with a PetKit session at
+DEBUG, checked as migration §4 describes; if the gate holds a stream, a
+`SessionOptions.subscribe_requires_online` option relaxes it (backlog).
 
 ## Q19. Does the gateway ever omit `dtlsParameters.fingerprints`?
 
