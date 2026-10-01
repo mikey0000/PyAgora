@@ -11,9 +11,11 @@ natively (sdp-transform 1.1.0); pinned by `tests/unit/sdp/test_offer.py`.
 ## Q2. Should the ORTC carry a DTLS role at all?
 
 The JS SDK sends none; HA-Luba's `server` fixed a deadlock; PetKit's
-`client` works. Today: `server` (D4), option to send none. Closes with a
-capture of a join where no role is sent and DTLS still completes, on both
-vendors.
+`client` works. Today: `server` (D4), option to send none. Narrowed by the
+2026-10-01 capture: with `server` the Mammotion gateway answered role
+`client` and DTLS completed (`on_p2p_ok`) in all six sessions
+(`fixtures/gateway/real/join_ok_luba2.json`). Still open: a join with no
+role, and PetKit.
 
 ## Q3. Do PetKit devices need `set_client_role` after join?
 
@@ -26,19 +28,22 @@ The WHEP PATCH path accepts them and drops them. Today: candidates are only
 sent in the join (D11). Closes by reading the JS SDK's ICE restart / trickle
 path or a capture.
 
-## Q5. Do the AP detail `8`/`4` TURN credentials ever work, and which port?
+## Q5. Closed: the AP detail `8`/`4` values are not TURN credentials
 
-HA-Luba saw 401s and switched to uid-derived credentials; PetKit tries the
-detail ones first. Today: uid by default (D12). `get_ice_servers` also
-builds `turn:` URLs on the fixed ports 3478/443 and ignores the port the AP
-returns for the TURN edge, as both copies shipped. Closes with a TURN
-allocation trace on each vendor.
+The TURN block's detail `8` is the `vid`, identical to the gateway block's, in all eight captured responses
+(`fixtures/ap/real/choose_server_response.json`), and the SDK reads it only as `vid` and derives TURN
+credentials from the uid alone (D32). `DETAIL_FIRST` was sending the vid as the username, which explains
+HA-Luba's 401s; it now gives the uid pair and is deprecated. With uid-derived credentials the browser's join
+ORTC listed relay candidates on the TURN edges. Detail `4` is a token-shaped value the SDK does not read.
+The fixed TURN ports are a backlog item.
 
 ## Q6. Does any current device set `openEncrypt`?
 
 If a Mammotion token arrives with `openEncrypt != 0` the stream cannot
 decode in a plain WebRTC consumer. Today: fields modelled, never sent, not
-decrypted (D20, Q17). Closes with a look at real token responses.
+decrypted (D20, Q17). Narrowed: all eight `stream/token` responses in the
+2026-10-01 HA log (Luba 2, Luba 3) carried `openEncrypt: 0`. Still open for
+Yuka, 4G models and PetKit.
 
 ## Q7. Should the MID extension also be stripped from the ORTC?
 
@@ -54,9 +59,11 @@ transceiver dump comparison.
 ## Q9. Which AP request details matter?
 
 `11`, `17`, `22` are sent; `6` (string uid) is sent when a string uid is
-known; `area_code` is now taken from the credentials. Today: that set.
-Closes with the JS SDK's `chooseServer` argument list cross-checked against
-a capture.
+known; `area_code` is now taken from the credentials. Narrowed: for
+Mammotion, `{"11": "CN,GLOBAL", "17": "1", "22": "CN,GLOBAL"}` alone got
+code 0 for both blocks in all eight requests
+(`fixtures/ap/real/choose_server_request.json`). Still open: whether `6`
+matters for PetKit (backlog), and the SDK's `chooseServer` argument list.
 
 ## Q10. `enableInstantVideo` and `enablePreallocPC`
 
@@ -75,7 +82,9 @@ whether repeated renews are penalised.
 Mammotion's token response carries `areaCode: "AREA_CODE_EU"`, an Android
 SDK enum name; the Web SDK sends `"CN,GLOBAL"`-style lists. Today: the
 library sends whatever the credentials carry, and the migration guide
-advises hosts to leave the default. Closes with an AP request using the
+advises hosts to leave the default. The 2026-10-01 capture sent the default
+`CN,GLOBAL` for tokens whose `areaCode` was `AREA_CODE_EU` and
+`AREA_CODE_GLOB`; every request succeeded. Closes with an AP request using the
 enum form and its response.
 
 ## Q13. What does `on_p2p_lost` mean for a subscribe-only client?
@@ -110,39 +119,55 @@ join, and only matters once a consumer that can decrypt exists.
 
 ## Q16. Shapes the fake gateway reconstructs
 
-`tests/fakegateway` had to choose, without a capture: the join payload's
-existing-stream key (`streams`), the join failure codes (2013 app id, 2014
-channel, 110 token, 2022 missing key), the ping reply (a success response
-with an empty `_message`, per protocol §4), subscribe error codes (2011
-before join, 2021 unknown stream), the `on_user_offline` reason (`quit`),
-the AP response `uri` (request uri + 1) and its detail keys (detail 19 as
-`sha-256 <fingerprint>` per edge), and the RTM failure `code` strings. Each closes with one real capture of that exchange;
-when the real shape differs, the fake changes first (testing.md §6).
+Closed by the 2026-10-01 capture, and the fake changed to match
+(testing.md §6): the join result lists **no** existing streams under any key
+(publishers already in the channel are announced by events right after it),
+and carries `attributes`, `ortc`, `rejoin_token`, `return_vosip`, `uid`,
+`vid` but no `cid`/`cname`; the ping reply is `{_id, _result}` with no
+`_message`; the subscribe ack is `{p2pid, uid}`; `on_add_video_stream` has no
+`codec` or `uint_id`; the quit carries `option: ""`; the AP response `uri` is
+the request's + 1, with top-level `detail {502}` and `wan_ip`, and detail 19
+holds bare fingerprints each followed by `;`; the gateway takes DTLS role
+`client` and its fingerprint is the AP's for that edge
+(`fixtures/gateway/real/`, `fixtures/ap/real/`). Still reconstructed: the
+join failure codes (2013, 2014, 110, 2022), subscribe error codes (2011,
+2021), the `on_user_offline` reason (`quit`), and the RTM failure `code`
+strings; each closes with one capture of that exchange.
 
 ## Q18. Does `on_user_online` always accompany `on_add_video_stream`?
 
 The session subscribes once both have been seen (the Mammotion rule;
 protocol §3.2); publishers found in the join payload count as online.
-PetKit's copy never depended on the event: it subscribed on
-`on_add_video_stream` alone and on the join-payload walk, and its
-`on_user_online` handler recorded a uid nothing read
-(`agora_websocket.py:433-470`, `:555-566`). Nothing on record shows whether a
-PetKit gateway sends it. The risk is real for PetKit's usual order: RTM
-`start_live` goes out just before the join, so the camera likely starts
-publishing after we joined, and that stream is subscribed only if
-`on_user_online` also arrives. Today: gated by default;
-`SessionOptions.subscribe_requires_online=False` drops the gate and PetKit
-passes it (D28). Closes with a default-mode PetKit session at DEBUG, checked
-as migration §4 describes: a `Holding stream … from uid … until
-on_user_online` line with no subscribe after it is the gate holding the
-stream. The answer decides the option's eventual default.
+Closed for Mammotion: in all eleven captured announcements
+`on_user_online` came first, 0 ms to 2.0 s before the stream, and a
+publisher can be online without ever publishing
+(`fixtures/sessions/luba3_vision.json`). Still open for PetKit: its copy
+subscribed on `on_add_video_stream` alone and on the join-payload walk
+(`agora_websocket.py:433-470`, `:555-566`), and RTM `start_live` goes out
+just before the join, so the camera likely starts publishing after we
+joined. Today: gated by default; `SessionOptions.subscribe_requires_online
+=False` drops the gate and PetKit passes it (D28). Closes with a
+default-mode PetKit session at DEBUG (migration §4): a `Holding stream …
+from uid … until on_user_online` line with no subscribe after it is the
+gate holding the stream.
 
 ## Q19. Does the gateway ever omit `dtlsParameters.fingerprints`?
 
-Every reconstructed join response carries one, yet both hosts merged in the
-AP's detail-19 fingerprints (HA-Luba's comment credits it with fixing DTLS
-that sent but never received). D26 fills them in only when the gateway sends
-none, which is what the merge changed in the answer. Closes with a capture of
-a join response without them, or of detail 19 whose value differs from the
-gateway's; the fake cannot yet omit them (backlog).
+Both hosts merged in the AP's detail-19 fingerprints (HA-Luba's comment
+credits it with fixing DTLS that sent but never received); D26 fills them in
+only when the gateway sends none. Narrowed: the Mammotion gateway sent one
+`sha-256` fingerprint in all six captured joins, equal to the AP's detail-19
+entry for the connected edge (`fixtures/sessions/*.json`), so for Mammotion
+the merge never changed the answer. Still open for PetKit; the fake now
+derives both from one value but cannot omit them (backlog).
 
+## Q20. Closed: the 2003 repeat-join eviction is per gateway edge
+
+Same uid, same edge: the gateway quit the older viewer with 2003 340 ms after the newer `join_v3`
+(`fixtures/sessions/luba2_left_then_right.json`). Same uid, different edges, joined 17 s apart with the first
+long settled: no quit, no `on_user_offline`, both answering pings 43.9 s after the second `join_v3`
+(`fixtures/sessions/luba2_two_edges.json`, protocol §5.3; the second viewer used `gateway_edge_offset=1`).
+So it was the edge, not the racing, that let `luba2_racing_pair.json` survive. A made-up viewer uid is not an
+alternative: the AP answers the token with uid + 1 with `2010009` (`NO_AUTHORIZED`) for both services, empty
+`cert`, no edges (`fixtures/ap/real/choose_server_rejected_no_authorized.json`,
+`fixtures/sessions/luba2_made_up_uid.json`). Two racing joins on one edge were not tried. Decision: D33.

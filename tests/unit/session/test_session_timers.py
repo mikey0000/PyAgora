@@ -9,6 +9,7 @@ import pytest
 from pyagorartc.const import (
     KEEPALIVE_INTERVAL_S,
     PING_INTERVAL_S,
+    PING_PONG_TIMEOUT_COUNT,
     RENEW_TOKEN_DEBOUNCE_S,
 )
 from pyagorartc.exceptions import SessionClosedError
@@ -19,6 +20,8 @@ from tests.unit.session._helpers import (
     START,
     TIMEOUT,
     Recorder,
+    event,
+    reply,
     rig,
 )
 
@@ -139,6 +142,64 @@ class TestPing:
         await r.mark(MARKER_UID + 1)
 
         assert r.conn.sent_of_type("ping") == []
+
+
+class TestPingTimeout:
+    async def ping(self, r: Rig, times: int = 1) -> list[dict[str, object]]:
+        """Let ``times`` ping intervals pass, each ending in a sent ping; the pings sent so far."""
+        for _ in range(times):
+            sent = len(r.conn.sent_of_type("ping"))
+            await r.sleepers(1)
+            r.sleep.advance(PING_INTERVAL_S)
+            await r.sent_type("ping", sent + 1)
+        return r.conn.sent_of_type("ping")
+
+    async def test_ends_the_session_on_the_tenth_tick_without_a_reply(self) -> None:
+        r = rig()
+        await r.join()
+        await self.ping(r, PING_PONG_TIMEOUT_COUNT - 1)
+        await r.sleepers(1)
+
+        r.sleep.advance(PING_INTERVAL_S)
+        await asyncio.wait_for(r.closed.wait_for(1), TIMEOUT)
+
+        assert r.closed.calls == [CloseReason.PING_TIMEOUT]
+        assert len(r.conn.sent_of_type("ping")) == PING_PONG_TIMEOUT_COUNT - 1
+        assert (r.conn.closed, r.conn.sent_of_type("leave")) == (True, [])
+
+    async def test_a_reply_keeps_the_session_up(self) -> None:
+        r = rig()
+        await r.join()
+        pings = await self.ping(r, PING_PONG_TIMEOUT_COUNT - 1)
+        r.conn.feed(reply("ping_back", pings[-1]))
+
+        await self.ping(r)
+
+        assert (r.session.is_joined, r.closed.calls) == (True, [])
+
+    async def test_other_gateway_frames_keep_the_session_up_without_replies(self) -> None:
+        r = rig()
+        await r.join()
+        await self.ping(r, PING_PONG_TIMEOUT_COUNT - 1)
+        r.conn.feed(event("on_rtp_capability_change"))
+        await r.mark()
+
+        await self.ping(r)
+
+        assert (r.session.is_joined, r.closed.calls) == (True, [])
+
+    async def test_logs_the_timeout_at_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        r = rig()
+        await r.join()
+        await self.ping(r, PING_PONG_TIMEOUT_COUNT - 1)
+        await r.sleepers(1)
+
+        r.sleep.advance(PING_INTERVAL_S)
+        await asyncio.wait_for(r.closed.wait_for(1), TIMEOUT)
+
+        assert any(
+            record.levelno == logging.WARNING and "answered no ping" in record.getMessage() for record in caplog.records
+        )
 
 
 class TestTokenRenewal:

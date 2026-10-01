@@ -11,7 +11,6 @@ from tests._helpers import CREDENTIALS, RTM_CREDENTIALS
 from tests.fakegateway._common import (
     CID,
     DEVICE_CNAME,
-    DEVICE_CODEC,
     DEVICE_PAYLOAD_TYPE,
     DEVICE_RTX_SSRC,
     DEVICE_SSRC,
@@ -22,7 +21,6 @@ from tests.fakegateway._common import (
     TURN_IPS,
     TURN_PASSWORD,
     TURN_PORT,
-    TURN_USERNAME,
     VID,
 )
 from tests.unit._fakes import ManualClock
@@ -54,17 +52,15 @@ class DevicePublisher:
     uid: int = DEVICE_UID
     ssrc: int = DEVICE_SSRC
     rtx_ssrc: int | None = DEVICE_RTX_SSRC
-    codec: str = DEVICE_CODEC
     payload_type: int = DEVICE_PAYLOAD_TYPE
     cname: str = DEVICE_CNAME
 
     def video_stream(self) -> JsonObject:
-        """The ``on_add_video_stream`` payload (protocol.md §3.2); also listed in the join payload."""
-        stream: JsonObject = {"uid": self.uid, "uint_id": self.uid, "video": True, "ssrcId": self.ssrc}
+        """The ``on_add_video_stream`` payload, keyed as captured (``gateway/real/on_add_video_stream.json``)."""
+        stream: JsonObject = {"cname": self.cname, "pt": self.payload_type}
         if self.rtx_ssrc is not None:
             stream["rtxSsrcId"] = self.rtx_ssrc
-        stream |= {"cname": self.cname, "codec": self.codec, "pt": self.payload_type}
-        return stream
+        return stream | {"ssrcId": self.ssrc, "uid": self.uid, "video": True}
 
 
 @dataclass(frozen=True)
@@ -151,6 +147,7 @@ class FakeAgoraState:
             "envelope_flag_order",
             "device_online",
             "dtls_role",
+            "answer_pings",
         }
     )
 
@@ -169,12 +166,12 @@ class FakeAgoraState:
     gateway_host: str = LOOPBACK
     gateway_port: int = 0
     turn_edges: tuple[Edge, ...] = tuple(Edge(ip, TURN_PORT) for ip in TURN_IPS)
-    turn_username: str = TURN_USERNAME
     turn_password: str = TURN_PASSWORD
     clock: ManualClock = field(default_factory=ManualClock)
 
     device_online: bool = True
-    dtls_role: str = "server"
+    dtls_role: str = "client"
+    answer_pings: bool = True
     reject_join: JoinRejection | None = None
     join_delay_s: float = 0.0
     drop_socket_after_join: bool = False

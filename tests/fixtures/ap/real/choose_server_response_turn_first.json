@@ -1,0 +1,82 @@
+{
+  "detail": {
+    "502": "192.0.2.2"
+  },
+  "enter_ts": 1790812131392,
+  "leave_ts": 1790812131492,
+  "opid": 616800436062,
+  "response_body": [
+    {
+      "buffer": {
+        "cert": "TURN_TICKET_REDACTED",
+        "cid": 123456788,
+        "cname": "channel-test",
+        "code": 0,
+        "detail": {
+          "1": "192.0.2.1",
+          "10": "DETAIL_10_REDACTED",
+          "2": "NA",
+          "23": "",
+          "3": "XX",
+          "4": "TURN_CRED_REDACTED",
+          "8": "987654",
+          "9": ""
+        },
+        "edges_services": [
+          {
+            "ip": "198.51.100.24",
+            "port": 443
+          },
+          {
+            "ip": "198.51.100.25",
+            "port": 443
+          },
+          {
+            "ip": "198.51.100.26",
+            "port": 443
+          }
+        ],
+        "flag": 4194310,
+        "uid": 123456
+      },
+      "uri": 23
+    },
+    {
+      "buffer": {
+        "cert": "TICKET_REDACTED",
+        "cid": 123456788,
+        "cname": "channel-test",
+        "code": 0,
+        "detail": {
+          "1": "192.0.2.1",
+          "10": "DETAIL_10_REDACTED",
+          "19": "8D:42:FE:DB:5F:19:AD:87:83:79:1A:E5:FA:BC:86:F3:44:0A:3E:F2:B6:3F:B6:A3:0F:DC:8D:9A:C2:20:AA:81;18:6F:CD:AC:9A:5C:39:C9:AE:6F:DA:58:8C:05:29:A4:FC:7F:01:00:50:0B:32:8B:E2:66:CF:D1:B0:8C:5A:97;52:3B:A5:53:E7:27:33:60:11:EE:EA:BA:2E:33:AA:D7:C9:DA:33:4C:4B:ED:E6:23:E8:B6:11:E8:86:7D:76:A9;",
+          "2": "NA",
+          "23": "",
+          "3": "XX",
+          "4": "TURN_CRED_REDACTED",
+          "8": "987654",
+          "9": ""
+        },
+        "edges_services": [
+          {
+            "ip": "203.0.113.13",
+            "port": 3478
+          },
+          {
+            "ip": "203.0.113.14",
+            "port": 3478
+          },
+          {
+            "ip": "203.0.113.15",
+            "port": 4716
+          }
+        ],
+        "flag": 4096,
+        "uid": 123456
+      },
+      "uri": 23
+    }
+  ],
+  "wan_ip": "192.0.2.1"
+}

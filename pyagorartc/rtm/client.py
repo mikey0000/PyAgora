@@ -11,6 +11,7 @@ from urllib.parse import quote
 
 import aiohttp
 
+from pyagorartc.capture import capture
 from pyagorartc.const import RTM_HOSTS, RTM_PEER_MESSAGES_PATH, RTM_TIMEOUT_S
 from pyagorartc.exceptions import RtmError
 from pyagorartc.models import fingerprint
@@ -119,7 +120,10 @@ class RtmRestClient:
             for host in self._iter_endpoints():
                 url = f"{host}{path}{query}"
                 try:
+                    capture("rtm", "out", body)
                     status, data = await self._post(url, headers, body)
+                    if isinstance(data, dict | list):
+                        capture("rtm", "in", data)
                 except (aiohttp.ClientError, TimeoutError) as exc:
                     _LOGGER.debug("RTM POST %s failed: %s", url, type(exc).__name__)
                     last_status = None

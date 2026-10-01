@@ -12,7 +12,7 @@ from pyagorartc.exceptions import GatewayConnectError, JoinRejectedError, JoinTi
 from pyagorartc.models import CloseReason, SessionOptions
 from pyagorartc.sdp import extract_inline_candidates
 from tests._helpers import RTC_TOKEN
-from tests.fakegateway._common import SERVER_ICE_UFRAG, dtls_fingerprint
+from tests.fakegateway._common import SERVER_ICE_UFRAG, edge_fingerprint
 from tests.integration._helpers import CHROME_OFFER, GO2RTC_OFFER, SESSION_ID, SESSION_TIMEOUT_S
 
 if TYPE_CHECKING:
@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from tests.integration._helpers import SessionRig
 
 MID_EXTENSION = "urn:ietf:params:rtp-hdrext:sdes:mid"
-GATEWAY_FINGERPRINT = f"a=fingerprint:sha-256 {dtls_fingerprint('fake-gateway-dtls')}"
 
 
 class TestJoinFrame:
@@ -79,29 +78,30 @@ class TestJoinFrame:
 
 
 class TestAnswer:
-    async def test_mirrors_the_fakes_default_server_role_as_passive(
+    async def test_mirrors_the_fakes_default_client_role_as_active(
         self, new_session: Callable[..., SessionRig]
     ) -> None:
+        answer = await new_session().join()
+
+        assert "a=setup:active" in answer  # the captured gateway role (gateway/real/join_ok_luba2.json)
+
+    async def test_answers_passive_when_the_gateway_takes_the_server_role(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        fake_agora.control(dtls_role="server")
+
         answer = await new_session().join()
 
         assert "a=setup:passive" in answer
 
-    async def test_answers_active_when_the_gateway_takes_the_client_role(
+    async def test_carries_the_gateway_ice_credentials_and_fingerprint_and_no_mid_extension(
         self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
     ) -> None:
-        fake_agora.control(dtls_role="client")
-
         answer = await new_session().join()
 
-        assert "a=setup:active" in answer
-
-    async def test_carries_the_gateway_ice_credentials_and_fingerprint_and_no_mid_extension(
-        self, new_session: Callable[..., SessionRig]
-    ) -> None:
-        answer = await new_session().join()
-
+        edge_print = edge_fingerprint(fake_agora.state.gateway_host, fake_agora.state.gateway_port)
         assert f"a=ice-ufrag:{SERVER_ICE_UFRAG}" in answer
-        assert GATEWAY_FINGERPRINT in answer
+        assert f"a=fingerprint:sha-256 {edge_print}" in answer
         assert MID_EXTENSION not in answer
 
     async def test_negotiates_a_go2rtc_offer_video_first(self, new_session: Callable[..., SessionRig]) -> None:
@@ -109,7 +109,7 @@ class TestAnswer:
 
         media = [line.split()[0] for line in answer.splitlines() if line.startswith("m=")]
         assert media == ["m=video", "m=audio"]
-        assert "a=setup:passive" in answer
+        assert "a=setup:active" in answer
 
     async def test_declares_the_devices_video_ssrc_when_asked(self, new_session: Callable[..., SessionRig]) -> None:
         r = new_session(SessionOptions(declare_remote_video_ssrc=True))

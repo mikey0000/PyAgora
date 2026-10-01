@@ -5,6 +5,7 @@ import logging
 
 import pytest
 
+from pyagorartc.ap import APResponse
 from pyagorartc.const import (
     EDGE_DOMAIN_SUFFIX,
 )
@@ -13,12 +14,14 @@ from pyagorartc.models import CloseReason, IceCandidate, SessionOptions
 from pyagorartc.sdp import extract_inline_candidates
 from tests._helpers import CREDENTIALS, RENEWED_TOKEN, RTC_TOKEN, SECRET_VALUES, UID, load_json_fixture
 from tests.unit.session._helpers import (
+    AP_RESPONSE,
     OFFER,
     SESSION_ID,
     TIMEOUT,
     WALL_S,
     Recorder,
     all_done,
+    announced,
     ap_with_fingerprints,
     ap_without_gateway_block,
     candidate_ips,
@@ -82,6 +85,25 @@ class TestJoin:
         assert r.transport.urls == [f"wss://203-0-113-10{EDGE_DOMAIN_SUFFIX}:4713"]
         assert r.transport.kwargs == [{"timeout_s": 4.0, "verify_ssl": True}]
 
+    @pytest.mark.parametrize(("offset", "first_edge"), [(1, "203-0-113-11"), (3, "203-0-113-10"), (5, "203-0-113-12")])
+    async def test_gateway_edge_offset_rotates_the_ap_edge_order(self, offset: int, first_edge: str) -> None:
+        """Q20: the offset wraps, so a host can spread sessions over the AP's edges without knowing how many there are."""
+        r = rig(SessionOptions(gateway_edge_offset=offset))
+
+        await r.join()
+
+        assert r.transport.urls == [f"wss://{first_edge}{EDGE_DOMAIN_SUFFIX}:4713"]
+
+    async def test_a_refusal_on_a_rotated_list_wraps_to_the_ap_first_edge(self) -> None:
+        r = rig(SessionOptions(gateway_edge_offset=2), refusals=1)
+
+        await r.join()
+
+        assert r.transport.urls == [
+            f"wss://203-0-113-12{EDGE_DOMAIN_SUFFIX}:4713",
+            f"wss://203-0-113-10{EDGE_DOMAIN_SUFFIX}:4713",
+        ]
+
     async def test_tries_the_next_edge_when_one_refuses(self) -> None:
         r = rig(refusals=1)
 
@@ -96,6 +118,16 @@ class TestJoin:
         await r.join()
 
         assert (r.session.is_joined, r.session.is_connected, r.session.close_reason) == (True, True, None)
+
+    async def test_logs_the_access_points_cid_since_the_join_result_carries_none(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        r = rig()
+
+        await r.join()
+
+        (line,) = [record.getMessage() for record in caplog.records if record.getMessage().startswith("Joined channel")]
+        assert line.endswith(f"(cid {APResponse.from_api_response(AP_RESPONSE).cid})")
 
     async def test_a_second_join_raises_session_closed(self) -> None:
         r = rig()
@@ -414,7 +446,7 @@ class TestClose:
 class TestSpawn:
     async def test_every_background_task_comes_from_the_injected_factory(self) -> None:
         r = rig(keepalive=Recorder(returns=[True]))
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
 
         foreign = asyncio.all_tasks() - {asyncio.current_task()} - set(r.spawned)
@@ -443,7 +475,8 @@ class TestTolerance:
         r.conn.feed(load_json_fixture("gateway/unknown_event.json"))
         await r.mark()
 
-        assert sum("on_published_user_list" in record.getMessage() for record in caplog.records) == 1
+        session_records = [record for record in caplog.records if record.name == "pyagorartc.session.session"]
+        assert sum("on_published_user_list" in record.getMessage() for record in session_records) == 1
 
     async def test_survives_text_that_is_not_a_json_object(self) -> None:
         r = rig()

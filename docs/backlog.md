@@ -4,10 +4,12 @@ Open work only; finished items are deleted.
 
 ## Library
 
-- **Record real gateway frames.** No server-to-client WebSocket frame has ever
-  been captured locally; `docs/protocol.md` §2–§5 are reconstructions. One
-  Frida run (`Luba-API/scripts/frida/agora-ws.js`) or one HA session with the
-  session logger at DEBUG turns them into fixtures under `tests/fixtures/`.
+- **Capture PetKit and RTM.** Mammotion's gateway and AP frames are captured
+  (`tests/fixtures/sessions/`, 2026-10-01). Still reconstructed: every PetKit
+  exchange, RTM (§8), join and subscribe failures, `on_user_offline`, token
+  expiry and `on_p2p_lost`. Enable the `pyagorartc.capture` logger at DEBUG
+  (D30) in the PetKit host, turn the lines into fixtures the same way, and
+  reconcile the fake (testing.md §6).
 
 - `tests/integration/test_ap_client.py` and `test_rtm_client.py` against the
   fake gateway's HTTP routes, covering the real `_post` seams (multipart
@@ -37,13 +39,27 @@ Open work only; finished items are deleted.
   credentials and asserts an answer SDP arrives.
 - A retry policy for `AgoraAPClient` beyond the primary/backup host loop,
   once real failure modes are recorded.
+- `get_ice_servers` builds `turn:` URLs on the fixed ports 3478/443 as both
+  hosts shipped; the SDK uses the port the AP returns for each TURN edge
+  (`t2`, D32). Follow it once a relay-only session on the AP's port is
+  captured.
+- `TurnCredentialStrategy.DETAIL_FIRST` goes at the next major version (D32).
 
 ## Hosts
 
 - HA-Luba: merge the `pyagorartc-migration` branch (`docs/migration.md` §2)
   once the hardware run below passes.
 - HA-Luba: run one WiFi and one 4G session on a Luba 2 and a Yuka across all
-  camera uids to validate the migration (Q2, Q5, Q6, Q10, Q11; migration §4).
+  camera uids to validate the migration (Q2, Q6, Q10, Q11; migration §4).
+- HA-Luba: give `CloseReason.PING_TIMEOUT` (D31) its own viewer message in
+  `camera.py::_CLOSE_MESSAGES`; until then it falls through to "Stream lost".
+- HA-Luba: pass `gateway_edge_offset=target_uid - 1` permanently (D33,
+  migration §2.4.1) and delete the temporary `_Q20_EXPERIMENT` switch from
+  `camera.py`.
+- Edge-aware placement: each camera's offset indexes its own AP answer, and
+  the answers' edge lists can differ (Q20 run 2), so two cameras can still
+  land on one edge. A host-supplied set of edges in use, skipped by
+  `_connect`, would close that; wait for a recorded collision first.
 - pymammotion drops its unused `sdp-transform`, `websockets`, `webrtc-models`
   requirements.
 - PetKit: migration per `docs/migration.md` §3. One go2rtc session per

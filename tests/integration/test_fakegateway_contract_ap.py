@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests._helpers import CREDENTIALS
+from tests._helpers import CREDENTIALS, load_json_fixture
+from tests.fakegateway._common import LOOPBACK, edge_fingerprint
 from tests.integration._helpers import AP_PATH, ap_envelope, ap_form
 
 if TYPE_CHECKING:
@@ -132,7 +133,6 @@ class TestChooseServerResponse:
         gateway = _block(body, 4096)
         assert gateway["code"] == 0
         assert gateway["edges_services"] == [{"ip": "127.0.0.1", "port": fake_agora.state.gateway_port}]
-        assert gateway["detail"]["candidate"] == f"127.0.0.1:{fake_agora.state.gateway_port}"
         assert (gateway["uid"], gateway["cname"], gateway["cert"]) == (
             CREDENTIALS.uid,
             CREDENTIALS.channel_name,
@@ -145,11 +145,20 @@ class TestChooseServerResponse:
         _, body = await _post(raw_http, fake_agora.ap_hosts[0], ap_envelope())
 
         gateway = _block(body, 4096)
-        fingerprints = gateway["detail"]["19"].split(";")
-        assert len(fingerprints) == len(gateway["edges_services"])
-        algorithm, value = fingerprints[0].split(" ")
-        assert algorithm == "sha-256"
-        assert len(value.split(":")) == 32
+        edges = gateway["edges_services"]
+        assert gateway["detail"]["19"] == "".join(f"{edge_fingerprint(e['ip'], e['port'])};" for e in edges)
+
+    async def test_blocks_and_top_level_carry_the_captured_detail_keys(
+        self, fake_agora: FakeAgora, raw_http: aiohttp.ClientSession
+    ) -> None:
+        real = load_json_fixture("ap/real/choose_server_response.json")
+
+        _, body = await _post(raw_http, fake_agora.ap_hosts[0], ap_envelope())
+
+        assert sorted(body) == sorted(real)
+        assert (body["detail"], body["wan_ip"]) == ({"502": LOOPBACK}, LOOPBACK)
+        for flag in (4096, 4194310):
+            assert sorted(_block(body, flag)["detail"]) == sorted(_block(real, flag)["detail"])
 
     async def test_turn_block_carries_test_net_edges_and_detail_credentials(
         self, fake_agora: FakeAgora, raw_http: aiohttp.ClientSession
@@ -160,7 +169,7 @@ class TestChooseServerResponse:
         assert turn["code"] == 0
         assert [e["ip"] for e in turn["edges_services"]] == ["203.0.113.10", "203.0.113.11", "203.0.113.12"]
         assert {e["port"] for e in turn["edges_services"]} == {443}
-        assert turn["detail"] == {"8": "turn-user-test", "4": "turn-pass-not-real"}
+        assert (turn["detail"]["8"], turn["detail"]["4"]) == (str(fake_agora.state.vid), "turn-pass-not-real")
 
     async def test_answers_only_the_requested_services(
         self, fake_agora: FakeAgora, raw_http: aiohttp.ClientSession

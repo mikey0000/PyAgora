@@ -1,0 +1,11 @@
+{
+  "_message": {
+    "cname": "o/i14u9pJrxRKAsu",
+    "pt": 49,
+    "rtxSsrcId": 40003,
+    "ssrcId": 40002,
+    "uid": 1,
+    "video": true
+  },
+  "_type": "on_add_video_stream"
+}

@@ -1,0 +1,39 @@
+{
+  "detail": {
+    "502": "192.0.2.2"
+  },
+  "enter_ts": 1790842823214,
+  "leave_ts": 1790842823502,
+  "opid": 378880333257,
+  "response_body": [
+    {
+      "buffer": {
+        "cert": "",
+        "cid": 123456789,
+        "cname": "channel-test",
+        "code": 2010009,
+        "detail": {
+          "10": "DETAIL_10_REDACTED"
+        },
+        "flag": 4096,
+        "uid": 123457
+      },
+      "uri": 23
+    },
+    {
+      "buffer": {
+        "cert": "",
+        "cid": 123456789,
+        "cname": "channel-test",
+        "code": 2010009,
+        "detail": {
+          "10": "DETAIL_10_REDACTED"
+        },
+        "flag": 4194310,
+        "uid": 123457
+      },
+      "uri": 23
+    }
+  ],
+  "wan_ip": "192.0.2.1"
+}

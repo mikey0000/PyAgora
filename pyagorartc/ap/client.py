@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from pyagorartc.ap.response import APResponse
+from pyagorartc.capture import capture
 from pyagorartc.const import (
     AP_HOSTS,
     AP_PATH,
@@ -227,7 +228,10 @@ class AgoraAPClient:
         for host in self._hosts:
             url = _endpoint_url(host, proxy_server)
             try:
+                capture("ap", "out", payload)
                 status, data = await self._post(url, {}, payload)
+                if isinstance(data, dict | list):
+                    capture("ap", "in", data)
             except (aiohttp.ClientError, TimeoutError) as exc:
                 status = None
                 _LOGGER.debug("AP host %s failed: %s", host, type(exc).__name__)

@@ -52,9 +52,10 @@ def to_rtc_ice_servers(ap: APResponse) -> list[RTCIceServer]:
 
 `use_all_turn_servers=False` is what both hosts pass today (three entries:
 udp, tcp, turns for the first TURN edge; PetKit `camera.py:638`). The TURN
-credential is the uid-derived one by default (D12).
-`strategy=TurnCredentialStrategy.DETAIL_FIRST` restores PetKit's old order,
-detail `8`/`4` then the uid pair (`agora_api.py:107-116`; Q5).
+credential is the uid-derived one, as the SDK derives it (D12, D32). Pass no
+`strategy`: `TurnCredentialStrategy.DETAIL_FIRST` (PetKit's old order, detail
+`8`/`4` then the uid pair, `agora_api.py:107-116`) is deprecated and now gives
+the same uid pair with a `DeprecationWarning`, because detail `8` is the `vid`.
 
 ### 1.3 Candidates
 
@@ -103,7 +104,7 @@ failure is a typed exception under `PyAgoraRTCError` (Constitution §5).
 |---|---|---|
 | `token_provider` | `async () -> str \| None` | on `on_token_privilege_will_expire`, at most once per 30 s (D8, Q11). `None` from it, or no provider, resends the last token sent. |
 | `on_peer_left` | `async (uid: int) -> None` | a publisher left and did not come back within `PeerRecovery`'s debounce, cooldown and attempt cap (D14). |
-| `on_closed` | `async (reason: CloseReason) -> None` | once, whatever ended the session (D14). |
+| `on_closed` | `async (reason: CloseReason) -> None` | once, whatever ended the session (D14), including `PING_TIMEOUT` when the gateway stops answering pings and sends nothing else (D31). |
 | `keepalive` | `async () -> bool` | every `keepalive_interval_s` s while joined; `False` stops it (D15). |
 | `on_stream` | `async (stream: RemoteStream) -> None` | once per subscription, from the subscribe task right after the first `subscribe` for that `(uid, ssrc)` is sent (a publisher that leaves and returns is subscribed, and reported, again). |
 | `spawn` | `(coro) -> asyncio.Task` | every owned background task is created through it (D13). |
@@ -406,6 +407,7 @@ Why each piece is there:
 | `_on_closed` returns on `JOIN_FAILED` | The session fires `on_closed(JOIN_FAILED)` before `join()` raises (D9, D23). The 500 in `_async_answer_offer` already told the viewer; a 503 on top would be a second error. |
 | `_on_closed` returns on `CLOSED_BY_HOST` | The host is already in its own close path (§1.5). |
 | `_on_closed` returns with no viewer left | Nobody to tell, and `async_close_webrtc_session` already ran or will. |
+| No message for `PING_TIMEOUT` | It falls through to "Stream lost", which is accurate: the gateway stopped answering (D31). A dedicated message is a backlog item. |
 | `keepalive_interval_s` not passed | The default (`const.KEEPALIVE_INTERVAL_S`, 3 s) is the shipped Mammotion cadence (D15). |
 
 `async_teardown_stream` replaces `self._agora_handler.disconnect()` with the
@@ -425,6 +427,28 @@ on WiFi. The library's deadline is independent of the keep-alive (D15), so
 gating it on `is_on_4g` at join time keeps WiFi streams unbounded as they
 were. See §2.5 for what that does to a mid-session network switch.
 
+### 2.4.1 Two cameras on one token
+
+The Mammotion stream token carries one viewer uid for every camera, and the gateway quits the older of two
+sessions with that uid on the same edge (2003, `GATEWAY_QUIT`). The AP refuses any other uid with that token
+(`2010009 NO_AUTHORIZED`), so each camera goes to its own edge instead (D33):
+
+```python
+options=SessionOptions(
+    client_codec="vp8",
+    target_uid=self.entity_description.target_uid,
+    gateway_edge_offset=self.entity_description.target_uid - 1,  # camera slot: left 0, right 1, third 2
+),
+```
+
+- The offset indexes the session's own AP answer and wraps. The Mammotion AP has listed three gateway edges
+  in every captured answer, so a Yuka's third camera still gets its own edge. With fewer edges than cameras
+  two cameras share an edge and 2003 returns.
+- Each camera's AP answer is fetched separately, and the lists can differ. In the Q20 capture both answers had
+  the same first edge, but the second and third differed. Distinct offsets do not guarantee distinct edges.
+  A refused edge also falls through to the next one in the rotated list, which may be another camera's.
+- Keep `_on_closed`'s `GATEWAY_QUIT` message: it is still what a collision looks like.
+
 ### 2.5 Behaviour changes Mammotion will see
 
 | Change | Decision | What the host does |
@@ -442,6 +466,7 @@ were. See §2.5 for what that does to a mid-session network switch.
 | Answer falls back to the offer's payload types when the gateway lists no codec | D1 | Nothing (was invalid SDP). |
 | AP detail-19 fingerprints are used only when the gateway ORTC has none | D26 | Nothing; the answer used the gateway's first fingerprint either way. |
 | Background tasks are owned and awaited on close | D13 | Pass `spawn` (§1.5). |
+| Two cameras can stream at once on one token | D33 | Pass `gateway_edge_offset` = camera slot (§2.4.1). |
 | Unchanged: no `set_client_role` (D6), ORTC DTLS role `server` (D4), `a=setup` mirrors the gateway (D5), MID stripped from the answer (D16), `leave` on close, 30 s renew debounce (D8) | | |
 
 Behaviour changes observed in the real migration (`pyagorartc-migration`):
@@ -506,7 +531,7 @@ Done on HA-Luba's `pyagorartc-migration` branch:
 Still open (backlog):
 
 - [ ] Run one WiFi and one 4G session on a Luba 2 and a Yuka, every camera
-      `target_uid`, before release (Q2, Q5, Q6, Q10, Q11; §4).
+      `target_uid`, before release (Q2, Q6, Q10, Q11; §4).
 - [ ] Open a `pymammotion` change dropping its unused `sdp-transform`,
       `websockets` and `webrtc-models` requirements.
 
@@ -635,10 +660,11 @@ async def _refresh_agora_context(self, creds: ChannelCredentials) -> APResponse:
   verified now (D10). The gateway socket already was (`agora_websocket.py:28-36`,
   `:166`). `AgoraAPClient(..., verify_ssl=False)` is the escape hatch.
 - PetKit's TURN credentials were AP detail `8`/`4` first, then the uid-derived
-  pair (`agora_api.py:107-116`). The library default is the uid pair (D12). Pass
-  `strategy=TurnCredentialStrategy.DETAIL_FIRST` in `to_rtc_ice_servers` to keep
-  PetKit's order (Q5). These servers reach only HA's frontend list
-  (`camera.py:204-207`): the go2rtc → Agora leg uses go2rtc's own ICE config.
+  pair (`agora_api.py:107-116`). Detail `8` is the `vid`, not a username, so
+  that order sent a bogus username; the library gives the uid pair, as the SDK
+  does (D32). Call `get_ice_servers` without a `strategy`. These servers reach
+  only HA's frontend list (`camera.py:204-207`): the go2rtc → Agora leg uses
+  go2rtc's own ICE config.
 - PetKit's AP request always carried detail `6` = `str(uid)` (`agora_api.py:320-321`,
   `:375`). The library sends it only when `ChannelCredentials.string_uid` is set,
   and then also puts `string_uid` into the join, which PetKit never sent
@@ -956,8 +982,8 @@ After:
 - [ ] Add `petkit_channel_credentials()` and `petkit_rtm_credentials()` (§3.2),
       and the camera's `account_user_id` property.
 - [ ] `camera.py`: `_refresh_agora_context(creds)` on `AgoraAPClient`, returning
-      the `APResponse`; `to_rtc_ice_servers` (with `DETAIL_FIRST` to keep the TURN
-      order); both callers adapted (§3.3). Delete `_filter_candidates` and
+      the `APResponse`; `to_rtc_ice_servers` (no `strategy`, D32); both callers
+      adapted (§3.3). Delete `_filter_candidates` and
       `filter_agora_candidates`.
 - [ ] `whep_proxy.py`: rewrite `create_session` with `PETKIT_OPTIONS` (§3.4);
       `close_session(device_id, *, session_id=None)`; `AgoraUpstreamSession`
@@ -983,7 +1009,6 @@ After:
 |---|---|---|---|
 | Q2 DTLS role in the ORTC | yes | yes | One session with `SessionOptions(ortc_dtls_role=None)`. DTLS completes and video plays → the SDK's "send none" is safe. PetKit shipped `client` (`agora_sdp.py:167`); if the default `server` stalls there, `ortc_dtls_role="client"` first. |
 | Q3 `set_client_role` after join | — (mowers leave when it is sent, D6) | yes | `PETKIT_OPTIONS` with `send_set_client_role=False`. Video still flows after 10 s and the camera stays in `remote_users` → drop the flag. The camera leaving within a second of first video, as the mowers did, means keep it. |
-| Q5 AP detail `8`/`4` TURN credentials | yes | weak (its TURN servers reach only HA's frontend list, §3.3) | `get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)` in `to_rtc_ice_servers`, with a relay-only browser (`iceTransportPolicy: "relay"`). A TURN 401 in the browser's ICE log answers it. |
 | Q6 `openEncrypt` | yes | — (`LiveFeed` has no such field) | Nothing to add on Mammotion: the WARNING already fires per offer when `openEncrypt` is set (§2.5). Watch the log; a hit is the answer, and a capture of that session is wanted. |
 | Q7 MID extension | — | yes | `PETKIT_OPTIONS` as shipped strips it. If go2rtc shows no video or logs undeclared SSRCs, retry with `strip_mid_extension=False`. Either way, note whether the answer carried `a=ssrc` (a stream was announced within 15 s). |
 | Q10 `enablePreallocPC` / `enableInstantVideo` | yes | yes | Mammotion: `instant_video=True`. PetKit already sends it; flip `prealloc_pc=False` (PetKit's old value, `agora_websocket.py:703`). One knob per run; compare time to first frame. |

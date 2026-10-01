@@ -18,6 +18,7 @@ from tests.unit.session._helpers import (
     PUBLISHER,
     TIMEOUT,
     Recorder,
+    announced,
     event,
     rig,
 )
@@ -45,7 +46,7 @@ class TestPeerRecovery:
     async def test_asks_the_host_to_recover_a_peer_still_gone_after_the_debounce(self) -> None:
         peer_left = Recorder()
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
         await self.depart(r)
         await r.sleepers(2)
 
@@ -57,7 +58,7 @@ class TestPeerRecovery:
     async def test_does_nothing_when_the_peer_rejoins_within_the_debounce(self) -> None:
         peer_left = Recorder()
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
         await self.depart(r)
         await self.return_(r)
 
@@ -69,7 +70,7 @@ class TestPeerRecovery:
     async def test_skips_a_second_departure_inside_the_cooldown(self) -> None:
         peer_left = Recorder()
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
         await self.recover_once(r, peer_left)
         await self.return_(r)
 
@@ -84,7 +85,7 @@ class TestPeerRecovery:
     async def test_stops_recovering_after_the_attempt_cap(self) -> None:
         peer_left = Recorder()
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
         for _ in range(PEER_RECOVER_MAX_ATTEMPTS):
             await self.recover_once(r, peer_left)
             await self.return_(r)
@@ -98,7 +99,7 @@ class TestPeerRecovery:
 
     async def test_arms_no_timer_without_an_on_peer_left_callback(self) -> None:
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
 
         await self.depart(r)
         await r.mark()
@@ -108,7 +109,7 @@ class TestPeerRecovery:
     async def test_a_raising_on_peer_left_leaves_the_session_running(self) -> None:
         peer_left = Recorder(error=RuntimeError("host recovery failed"))
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
 
         await self.recover_once(r, peer_left)
         await r.mark()
@@ -118,7 +119,7 @@ class TestPeerRecovery:
     async def test_only_the_latest_departure_is_recovered(self) -> None:
         peer_left = Recorder()
         r = rig(on_peer_left=peer_left)
-        await r.join()
+        await r.join(extra=announced())
         r.conn.feed(event("on_user_online", uid=OTHER_PUBLISHER))
         await self.depart(r)
         r.conn.feed(event("on_user_offline", uid=OTHER_PUBLISHER))
@@ -150,7 +151,7 @@ class TestPeerRecovery:
                 settled.set()
 
         r = rig(on_peer_left=recovering)
-        await r.join()
+        await r.join(extra=announced())
         r.conn.feed(event("on_user_online", uid=OTHER_PUBLISHER))
         await self.depart(r)
         await r.sleepers(2)

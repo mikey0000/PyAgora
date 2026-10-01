@@ -21,6 +21,7 @@ from tests.unit.session._helpers import (
     STREAM_SSRC,
     TIMEOUT,
     Recorder,
+    announced,
     event,
     join_ok_with_uid,
     reply,
@@ -33,7 +34,7 @@ class TestExistingStreams:
     async def test_subscribes_once_to_a_stream_listed_in_the_join_payload(self) -> None:
         r = rig()
 
-        await r.join(extra=(load_json_fixture("gateway/on_add_video_stream.json"),))
+        await r.join("join_ok_with_streams", extra=(load_json_fixture("gateway/on_add_video_stream.json"),))
         await r.mark()
 
         (frame,) = r.subscribes()
@@ -46,7 +47,7 @@ class TestExistingStreams:
     async def test_counts_the_publisher_of_an_existing_stream_as_present(self) -> None:
         r = rig()
 
-        await r.join()
+        await r.join("join_ok_with_streams")
 
         assert r.session.remote_users == frozenset({PUBLISHER})
         assert [s.ssrc for s in r.session.remote_streams] == [STREAM_SSRC]
@@ -54,7 +55,7 @@ class TestExistingStreams:
     async def test_ignores_an_existing_stream_from_another_uid_than_the_target(self) -> None:
         r = rig(SessionOptions(target_uid=OTHER_PUBLISHER))
 
-        await r.join()
+        await r.join("join_ok_with_streams")
         await r.mark(OTHER_PUBLISHER)
 
         assert r.subscribes(PUBLISHER) == []
@@ -96,7 +97,11 @@ class TestStreamAnnouncements:
             await r.mark()
 
         # A host diagnoses Q18 from this line: the stream is known, its publisher's presence is not.
-        (held,) = [rec for rec in caplog.records if "on_user_online" in rec.getMessage()]
+        (held,) = [
+            rec
+            for rec in caplog.records
+            if rec.name == "pyagorartc.session.session" and "on_user_online" in rec.getMessage()
+        ]
         assert held.levelno == logging.DEBUG
         assert f"uid {PUBLISHER}" in held.getMessage()
 
@@ -204,7 +209,7 @@ class TestSubscribeWithoutPresence:
 class TestSubscribeRetry:
     async def test_resubscribes_after_a_refused_ack_until_one_succeeds(self) -> None:
         r = rig(SessionOptions(subscribe_retry_attempts=3, subscribe_retry_delay_s=1.0))
-        await r.join()
+        await r.join(extra=announced())
         (first,) = await r.sent_type("subscribe")
         r.conn.feed(subscribe_ack(first, ok=False))
         await r.sleepers(2)
@@ -220,7 +225,7 @@ class TestSubscribeRetry:
 
     async def test_gives_up_after_the_configured_attempts_without_an_ack(self) -> None:
         r = rig(SessionOptions(subscribe_retry_attempts=1, subscribe_retry_delay_s=1.0))
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
         await r.sleepers(2)
 
@@ -237,7 +242,7 @@ class TestSubscribeRetry:
     async def test_stops_retrying_once_the_publisher_goes_offline(self) -> None:
         """The retry task outlived its publisher and kept re-subscribing to a stream that was gone."""
         r = rig(SessionOptions(subscribe_retry_attempts=3, subscribe_retry_delay_s=1.0))
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
         r.conn.feed(load_json_fixture("gateway/on_user_offline.json"))
         await r.sent_type("unsubscribe")
@@ -251,7 +256,7 @@ class TestSubscribeRetry:
     async def test_a_returning_publisher_gets_one_retry_loop(self) -> None:
         """A publisher back with the same ssrc got a second retry loop beside the first, doubling every re-send."""
         r = rig(SessionOptions(subscribe_retry_attempts=3, subscribe_retry_delay_s=1.0))
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
         r.conn.feed(load_json_fixture("gateway/on_user_offline.json"))
         r.conn.feed(load_json_fixture("gateway/on_user_online.json"))
@@ -265,7 +270,7 @@ class TestSubscribeRetry:
 
     async def test_subscribes_once_when_retries_are_off_even_if_refused(self) -> None:
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
         (first,) = await r.sent_type("subscribe")
 
         r.conn.feed(subscribe_ack(first, ok=False))
@@ -289,7 +294,7 @@ class TestUserPresence:
 
     async def test_unsubscribes_a_departed_publishers_stream(self) -> None:
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
 
         r.conn.feed(load_json_fixture("gateway/on_user_offline.json"))
@@ -302,7 +307,7 @@ class TestUserPresence:
     async def test_unsubscribes_once_from_a_publisher_with_two_streams(self) -> None:
         """``unsubscribe`` names a uid, not a stream, yet the session sent one per subscribed ssrc."""
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
         r.conn.feed(event("on_add_video_stream", ssrcId=STREAM_SSRC + 1))
         await r.sent_type("subscribe", 2)
 
@@ -322,7 +327,7 @@ class TestUserPresence:
 
     async def test_ignores_presence_events_without_a_uid(self) -> None:
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
 
         r.conn.feed(load_json_fixture("gateway/on_user_offline_no_uid.json"))
         await r.mark()
@@ -365,7 +370,7 @@ class TestDeclaredRemoteSsrc:
     async def test_declares_an_existing_stream_without_waiting(self) -> None:
         r = rig(SessionOptions(declare_remote_video_ssrc=True))
 
-        answer = await r.join(offer=GO2RTC_OFFER)
+        answer = await r.join("join_ok_with_streams", offer=GO2RTC_OFFER)
 
         assert f"a=ssrc:{STREAM_SSRC} cname:" in answer
 

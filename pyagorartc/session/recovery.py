@@ -1,4 +1,4 @@
-"""Timing policies the session runtime applies: peer recovery, keep-alive cadence and renew debounce.
+"""Timing policies the session runtime applies: peer recovery, keep-alive cadence, renew debounce, ping watchdog.
 
 Pure: each policy reads an injected monotonic clock (or a ``now`` the caller passes) and owns no task;
 the runtime owns every loop and timer (D13).
@@ -16,6 +16,8 @@ from pyagorartc.const import (
     PEER_RECOVER_MAX_ATTEMPTS,
     PEER_RECOVER_RESET_S,
     PEER_REJOIN_DEBOUNCE_S,
+    PING_PONG_TIMEOUT_COUNT,
+    PING_SILENCE_S,
     RENEW_TOKEN_DEBOUNCE_S,
 )
 
@@ -164,3 +166,59 @@ class RenewDebounce:
     def clear(self) -> None:
         """Let the next renew through regardless of the window."""
         self._last_sent_at = None
+
+
+class PingWatchdog:
+    """When a gateway that stopped answering pings is presumed gone (D31; the SDK's ``handlePingPong``).
+
+    The runtime, every ``PING_INTERVAL_S`` while joined: calls ``tick``; ends the session with
+    ``CloseReason.PING_TIMEOUT`` when it returns True, else calls ``sent`` with the new ping's id and sends
+    it. Every decoded inbound frame calls ``frame_received``; a response calls ``reply`` first, which says
+    whether it answered a ping. ``unanswered`` counts ticks since the last successful reply, the current
+    one included, so the tenth tick follows nine unanswered pings; a ``failed`` reply does not reset it.
+    Only the newest ``max_unanswered`` ids are kept, so a reply later than that is a stray.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_unanswered: int = PING_PONG_TIMEOUT_COUNT,
+        silence_s: float = PING_SILENCE_S,
+        clock: Callable[[], float],
+    ) -> None:
+        self.max_unanswered = max_unanswered
+        self.silence_s = silence_s
+        self._clock = clock
+        self._last_frame_at = clock()
+        self._unanswered = 0
+        self._outstanding: dict[str, None] = {}
+
+    @property
+    def unanswered(self) -> int:
+        """Ticks since the last successful reply."""
+        return self._unanswered
+
+    def frame_received(self, now: float | None = None) -> None:
+        """Record that the gateway sent something (the SDK's ``lastMsgTime``)."""
+        self._last_frame_at = self._clock() if now is None else now
+
+    def tick(self, now: float | None = None) -> bool:
+        """Count one ping tick; True when ``max_unanswered`` is reached and no frame came for over ``silence_s``."""
+        now = self._clock() if now is None else now
+        self._unanswered += 1
+        return self._unanswered >= self.max_unanswered and now - self._last_frame_at > self.silence_s
+
+    def sent(self, request_id: str) -> None:
+        """Track a ping about to be sent; the oldest id is forgotten beyond ``max_unanswered``."""
+        self._outstanding[request_id] = None
+        while len(self._outstanding) > self.max_unanswered:
+            del self._outstanding[next(iter(self._outstanding))]
+
+    def reply(self, request_id: str, *, ok: bool) -> bool:
+        """Whether ``request_id`` was an outstanding ping (now matched); a successful one resets ``unanswered``."""
+        if request_id not in self._outstanding:
+            return False
+        del self._outstanding[request_id]
+        if ok:
+            self._unanswered = 0
+        return True

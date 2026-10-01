@@ -28,7 +28,6 @@ from tests.fakegateway._common import (
     TURN_IPS,
     TURN_PASSWORD,
     TURN_PORT as FAKE_TURN_EDGE_PORT,
-    TURN_USERNAME,
 )
 
 if TYPE_CHECKING:
@@ -106,14 +105,19 @@ class TestChooseServer:
             (str(CREDENTIALS.uid), derive_password(CREDENTIALS.uid))
         }
 
-    async def test_detail_first_ice_servers_use_the_turn_blocks_detail_credentials(
+    async def test_detail_first_ice_servers_use_the_uid_credentials_not_the_vid(
         self, fake_agora: FakeAgora, raw_http: aiohttp.ClientSession
     ) -> None:
         client = AgoraAPClient(session=raw_http, hosts=fake_agora.ap_hosts)
+        response = await _choose(client)
 
-        servers = (await _choose(client)).get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
+        with pytest.warns(DeprecationWarning, match="DETAIL_FIRST"):
+            servers = response.get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
 
-        assert {(s.username, s.credential) for s in servers} == {(TURN_USERNAME, TURN_PASSWORD)}
+        # The fake's TURN block carries the vid as detail 8, as the captured one does (D32).
+        assert {(s.username, s.credential) for s in servers} == {
+            (str(CREDENTIALS.uid), derive_password(CREDENTIALS.uid))
+        }
 
     async def test_sends_the_payload_build_request_payload_builds_for_the_same_clock_and_ids(
         self, fake_agora: FakeAgora, raw_http: aiohttp.ClientSession, fake_clock: ManualClock

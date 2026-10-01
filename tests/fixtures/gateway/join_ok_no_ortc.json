@@ -1,10 +1,14 @@
 {
   "_id": "a1b2c3",
-  "_result": "success",
   "_message": {
+    "attributes": {
+      "userAttributes": {
+        "subscribeAudioFilterTopN": 0
+      }
+    },
+    "return_vosip": false,
     "uid": 123456,
-    "cid": 123456789,
-    "vid": 987654,
-    "cname": "channel-test"
-  }
+    "vid": 987654
+  },
+  "_result": "success"
 }

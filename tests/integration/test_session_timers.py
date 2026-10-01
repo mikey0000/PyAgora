@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from pyagorartc.const import KEEPALIVE_INTERVAL_S, PING_INTERVAL_S, RENEW_TOKEN_DEBOUNCE_S
+from pyagorartc.const import KEEPALIVE_INTERVAL_S, PING_INTERVAL_S, PING_PONG_TIMEOUT_COUNT, RENEW_TOKEN_DEBOUNCE_S
 from pyagorartc.models import CloseReason
 from tests._helpers import RENEWED_TOKEN, RTC_TOKEN
 from tests.fakegateway.gateway import WILL_EXPIRE_INTERVAL_S
@@ -122,3 +122,34 @@ class TestPing:
         await r.advance(PING_INTERVAL_S)
 
         assert len(await r.received("ping", 2)) == 2
+
+    async def test_a_gateway_that_stops_answering_pings_ends_the_session_with_ping_timeout(
+        self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]
+    ) -> None:
+        fake_agora.control(answer_pings=False)
+        r = new_session()
+        await r.join()
+        for sent in range(1, PING_PONG_TIMEOUT_COUNT):
+            await r.sleepers(1)
+            await r.advance(PING_INTERVAL_S)
+            await r.received("ping", sent)
+        await r.sleepers(1)
+
+        await r.advance(PING_INTERVAL_S)
+        await r.ended()
+
+        assert r.closed.calls == [CloseReason.PING_TIMEOUT]
+        assert len(fake_agora.state.log.received_of_type("ping")) == PING_PONG_TIMEOUT_COUNT - 1
+
+    async def test_answered_pings_keep_the_session_up_past_the_timeout(
+        self, new_session: Callable[..., SessionRig]
+    ) -> None:
+        r = new_session()
+        await r.join()
+
+        for sent in range(1, PING_PONG_TIMEOUT_COUNT + 1):
+            await r.sleepers(1)
+            await r.advance(PING_INTERVAL_S)
+            await r.received("ping", sent)
+
+        assert (r.session.is_joined, r.closed.calls) == (True, [])

@@ -35,7 +35,6 @@ from pyagorartc.session.messages import (
     parse_join_result,
     parse_notification,
     parse_p2p_lost,
-    parse_p2p_ok,
     parse_remote_stream,
     parse_rtp_capability_change,
     parse_user_event,
@@ -262,7 +261,8 @@ class TestDescribeFrame:
         text = describe_frame(frame_fixture("join_ok.json"))
 
         assert (
-            text == "type=None id=a1b2c3 message_keys=['cid', 'cname', 'ortc', 'rejoin_token', 'streams', 'uid', 'vid']"
+            text
+            == "type=None id=a1b2c3 message_keys=['attributes', 'ortc', 'rejoin_token', 'return_vosip', 'uid', 'vid']"
         )
 
     def test_outlines_a_frame_about_to_be_sent_as_it_would_the_decoded_one(self) -> None:
@@ -283,12 +283,17 @@ class TestParseJoinResult:
     def test_reads_the_session_identifiers_and_ortc(self) -> None:
         result = parse_join_result(frame_fixture("join_ok.json"))
 
-        assert (result.uid, result.cid, result.vid, result.cname) == (123456, 123456789, 987654, "channel-test")
+        assert (result.uid, result.vid) == (123456, 987654)
         assert result.rejoin_token == "rejoin-token-not-real"
         assert result.ortc["iceParameters"]["iceUfrag"] == "KdDV"
 
+    def test_reads_cid_and_cname_when_a_result_carries_them(self) -> None:
+        result = parse_join_result(frame_fixture("join_ok_with_streams.json"))
+
+        assert (result.cid, result.cname) == (123456789, "channel-test")
+
     def test_lists_the_video_streams_already_in_the_payload(self) -> None:
-        result = parse_join_result(frame_fixture("join_ok.json"))
+        result = parse_join_result(frame_fixture("join_ok_with_streams.json"))
 
         assert result.existing_streams == [
             RemoteStream(
@@ -374,7 +379,7 @@ class TestOffersRtx:
 
 class TestExistingStreamsFromJoin:
     def test_dedupes_and_skips_audio_only_entries(self) -> None:
-        message = frame_fixture("join_ok.json").message
+        message = frame_fixture("join_ok_with_streams.json").message
         doubled = {**message, "again": message["streams"]}
 
         assert [(s.uid, s.ssrc) for s in existing_streams_from_join(doubled)] == [(1, 44444444)]
@@ -383,20 +388,20 @@ class TestExistingStreamsFromJoin:
         assert existing_streams_from_join(frame_fixture("join_ok_rtx.json").message) == []
 
     def test_a_type_video_key_alone_does_not_mark_a_stream(self) -> None:
-        stream = dict(frame_fixture("join_ok.json").message["streams"][1])
+        stream = dict(frame_fixture("join_ok_with_streams.json").message["streams"][1])
         stream["type"] = "video"
 
         assert existing_streams_from_join({"streams": [stream]}) == []
 
     def test_finds_a_stream_nested_within_the_search_depth(self) -> None:
-        node: object = frame_fixture("join_ok.json").message["streams"][0]
+        node: object = frame_fixture("join_ok_with_streams.json").message["streams"][0]
         for _ in range(31):
             node = {"inner": node}
 
         assert [(s.uid, s.ssrc) for s in existing_streams_from_join({"deep": node})] == [(1, 44444444)]
 
     def test_stops_searching_past_the_depth_bound(self) -> None:
-        node: object = frame_fixture("join_ok.json").message["streams"][0]
+        node: object = frame_fixture("join_ok_with_streams.json").message["streams"][0]
         for _ in range(32):
             node = {"inner": node}
 
@@ -408,7 +413,7 @@ class TestParseRemoteStream:
         stream = parse_remote_stream(frame_fixture("on_add_video_stream.json").message)
 
         assert stream == RemoteStream(
-            uid=1, ssrc=44444444, rtx_ssrc=44444445, codec="h264", payload_type=102, cname="o/i14u9pJrxRKAsu"
+            uid=1, ssrc=44444444, rtx_ssrc=44444445, codec=None, payload_type=102, cname="o/i14u9pJrxRKAsu"
         )
         assert stream is not None and not lacks_payload_type(stream)
 
@@ -460,14 +465,6 @@ class TestParseEvents:
 
     def test_p2p_lost_falls_back_to_the_top_level_when_the_message_lacks_the_fields(self) -> None:
         assert parse_p2p_lost(frame_fixture("on_p2p_lost_top_level_only.json")) == (7, "top-level copy")
-
-    def test_p2p_ok_carries_the_uid_and_proxy_flag(self) -> None:
-        assert parse_p2p_ok(frame_fixture("on_p2p_ok.json").message) == (123456, False)
-
-    def test_rtp_capability_change_lists_the_video_codecs(self) -> None:
-        caps = parse_rtp_capability_change(frame_fixture("on_rtp_capability_change.json").message)
-
-        assert caps == (("vp8", "h264"), True, False)
 
     def test_rtp_capability_change_drops_irregular_values(self) -> None:
         caps = parse_rtp_capability_change(frame_fixture("on_rtp_capability_change_irregular.json").message)

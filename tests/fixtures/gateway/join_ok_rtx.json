@@ -1,11 +1,11 @@
 {
   "_id": "a1b2c3",
-  "_result": "success",
   "_message": {
-    "uid": 123456,
-    "cid": 123456789,
-    "vid": 987654,
-    "cname": "channel-test",
+    "attributes": {
+      "userAttributes": {
+        "subscribeAudioFilterTopN": 0
+      }
+    },
     "ortc": {
       "cname": "o/i14u9pJrxRKAsu",
       "iceParameters": {
@@ -104,6 +104,10 @@
           ]
         }
       }
-    }
-  }
+    },
+    "return_vosip": false,
+    "uid": 123456,
+    "vid": 987654
+  },
+  "_result": "success"
 }

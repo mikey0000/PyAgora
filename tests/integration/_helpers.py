@@ -162,6 +162,18 @@ async def recv_frame(ws: ClientConnection) -> Frame:
     return frame
 
 
+async def recv_join_followups(ws: ClientConnection, *, announced: bool = True) -> list[Frame]:
+    """The frames the fake sends right after a join result, in the captured order (protocol.md §2.5).
+
+    ``on_rtp_capability_change`` always; then ``on_user_online`` and ``on_add_video_stream`` when the
+    device was publishing at join time.
+    """
+    frames = [await recv_frame(ws) for _ in range(3 if announced else 1)]
+    expected = ["on_rtp_capability_change", "on_user_online", "on_add_video_stream"][: len(frames)]
+    assert [f.get("_type") for f in frames] == expected
+    return frames
+
+
 def rtm_url(host: str, *, app_id: str | None = None, user_id: str | None = None, wait_for_ack: bool = False) -> str:
     path = (
         f"/dev/v2/project/{app_id or RTM_CREDENTIALS.app_id}/rtm/users/"

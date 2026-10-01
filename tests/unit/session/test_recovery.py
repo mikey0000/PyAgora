@@ -8,9 +8,12 @@ from pyagorartc.const import (
     PEER_RECOVER_MAX_ATTEMPTS,
     PEER_RECOVER_RESET_S,
     PEER_REJOIN_DEBOUNCE_S,
+    PING_INTERVAL_S,
+    PING_PONG_TIMEOUT_COUNT,
+    PING_SILENCE_S,
     RENEW_TOKEN_DEBOUNCE_S,
 )
-from pyagorartc.session.recovery import Keepalive, PeerRecovery, RenewDebounce
+from pyagorartc.session.recovery import Keepalive, PeerRecovery, PingWatchdog, RenewDebounce
 from tests.unit._fakes import ManualClock
 
 if TYPE_CHECKING:
@@ -26,6 +29,16 @@ def recover_after_debounce(policy: PeerRecovery, clock: ManualClock) -> bool:
         return False
     clock.advance(delay)
     return policy.should_recover(PEER, peer_present=False)
+
+
+def ping_unanswered(watchdog: PingWatchdog, clock: ManualClock, ticks: int) -> list[bool]:
+    """Run ``ticks`` ping ticks the way the session does, one interval apart, with no reply; each tick's verdict."""
+    verdicts = []
+    for n in range(ticks):
+        clock.advance(PING_INTERVAL_S)
+        verdicts.append(watchdog.tick())
+        watchdog.sent(f"ping-{n}")
+    return verdicts
 
 
 def exhaust(policy: PeerRecovery, clock: ManualClock) -> None:
@@ -247,3 +260,75 @@ class TestRenewDebounce:
         debounce.clear()
 
         assert debounce.should_send()
+
+
+class TestPingWatchdog:
+    def test_uses_the_sdks_ten_ticks_and_ten_seconds_of_silence(self) -> None:
+        watchdog = PingWatchdog(clock=ManualClock())
+
+        assert (watchdog.max_unanswered, watchdog.silence_s) == (PING_PONG_TIMEOUT_COUNT, PING_SILENCE_S) == (10, 10.0)
+
+    def test_gives_up_on_the_tenth_tick_without_a_reply(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock)
+
+        verdicts = ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT)
+
+        assert verdicts == [False] * (PING_PONG_TIMEOUT_COUNT - 1) + [True]
+
+    def test_a_successful_reply_to_an_outstanding_ping_starts_the_count_again(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock)
+        ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT - 1)
+
+        assert watchdog.reply("ping-0", ok=True)
+
+        assert ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT - 1) == [False] * (PING_PONG_TIMEOUT_COUNT - 1)
+        assert watchdog.unanswered == PING_PONG_TIMEOUT_COUNT - 1
+
+    def test_a_failed_reply_is_matched_but_does_not_count_as_an_answer(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock)
+        ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT - 1)
+
+        assert watchdog.reply("ping-0", ok=False)
+
+        assert ping_unanswered(watchdog, clock, 1) == [True]
+
+    def test_keeps_going_past_the_count_while_other_frames_arrive(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock)
+        ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT - 1)
+        watchdog.frame_received()
+
+        verdicts = ping_unanswered(watchdog, clock, 4)
+
+        # The 10th tick is 3 s after the frame, the 13th 12 s: silence must exceed 10 s.
+        assert verdicts == [False, False, False, True]
+
+    def test_counts_silence_from_construction_until_the_first_frame(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock, max_unanswered=1, silence_s=5.0)
+
+        assert not watchdog.tick(now=clock.now + 5.0)
+        assert watchdog.tick(now=clock.now + 5.1)
+
+    def test_matches_only_ids_it_sent_and_each_once(self) -> None:
+        watchdog = PingWatchdog(clock=ManualClock())
+        watchdog.sent("ab7c5d")
+
+        matched = [
+            watchdog.reply("other", ok=True),
+            watchdog.reply("ab7c5d", ok=True),
+            watchdog.reply("ab7c5d", ok=True),
+        ]
+
+        assert matched == [False, True, False]
+
+    def test_forgets_ids_older_than_the_count_so_a_reply_that_late_is_unmatched(self) -> None:
+        clock = ManualClock()
+        watchdog = PingWatchdog(clock=clock)
+        ping_unanswered(watchdog, clock, PING_PONG_TIMEOUT_COUNT + 1)
+
+        assert not watchdog.reply("ping-0", ok=True)
+        assert watchdog.reply("ping-1", ok=True)

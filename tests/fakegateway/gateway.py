@@ -15,7 +15,7 @@ from tests.fakegateway._common import (
     SERVER_ICE_PWD,
     SERVER_ICE_UFRAG,
     decode,
-    dtls_fingerprint,
+    edge_fingerprint,
     encode,
     event,
     failed,
@@ -50,10 +50,15 @@ _RTCP_FEEDBACKS = [
     {"type": "ccm", "parameter": "fir"},
     {"type": "nack"},
     {"type": "nack", "parameter": "pli"},
+    {"type": "rrtr"},
 ]
 _EXT_ABS_SEND_TIME = "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
 _EXT_TWCC = "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
 _EXT_MID = "urn:ietf:params:rtp-hdrext:sdes:mid"
+#: Sent right after every join result (``gateway/real/on_rtp_capability_change.json``).
+RTP_CAPABILITIES: JsonObject = {"extmap_allow_mixed": False, "video_codec": ["H264", "VP8"], "web_av1_svc": False}
+#: The join result's ``attributes`` (``gateway/real/join_ok_luba2.json``).
+JOIN_ATTRIBUTES: JsonObject = {"userAttributes": {"subscribeAudioFilterTopN": 0}}
 
 
 @dataclass
@@ -72,78 +77,80 @@ class GatewayConnection:
         self.timers.clear()
 
 
+def _video_codec(payload_type: int, name: str, parameters: JsonObject) -> JsonObject:
+    return {
+        "fmtp": {"parameters": parameters},
+        "payloadType": payload_type,
+        "rtcpFeedbacks": _RTCP_FEEDBACKS,
+        "rtpMap": {"clockRate": 90000, "encodingName": name},
+    }
+
+
+def _rtx(payload_type: int, apt: int) -> JsonObject:
+    return {
+        "fmtp": {"parameters": {"apt": str(apt)}},
+        "payloadType": payload_type,
+        "rtcpFeedbacks": [{"type": "rrtr"}],
+        "rtpMap": {"clockRate": 90000, "encodingName": "rtx"},
+    }
+
+
 def server_ortc(state: FakeAgoraState) -> JsonObject:
-    """The gateway's ORTC in the join response: ice-lite parameters, DTLS, and its capabilities."""
+    """The gateway's ORTC in the join result, shaped as captured (``gateway/real/join_ok_luba2.json``).
+
+    One ``sendrecv`` bucket with an ``rtx`` codec per video codec, the connected edge's detail-19
+    fingerprint, and a host candidate on the edge's address in IPv4 and IPv6.
+    """
+    edge = state.gateway_edges[0]
+    candidate = {"foundation": "udpcandidate", "port": MEDIA_PORT, "priority": CANDIDATE_PRIORITY, "protocol": "udp"}
     return {
         "cname": state.device.cname,
-        "iceParameters": {
-            "iceUfrag": SERVER_ICE_UFRAG,
-            "icePwd": SERVER_ICE_PWD,
-            "candidates": [
-                {
-                    "foundation": "udpcandidate",
-                    "ip": state.gateway_host,
-                    "port": MEDIA_PORT,
-                    "priority": CANDIDATE_PRIORITY,
-                    "protocol": "udp",
-                    "type": "host",
-                }
-            ],
-        },
         "dtlsParameters": {
+            "fingerprints": [{"algorithm": "sha-256", "fingerprint": edge_fingerprint(edge.ip, edge.port)}],
             "role": state.dtls_role,
-            "fingerprints": [{"algorithm": "sha-256", "fingerprint": dtls_fingerprint("fake-gateway-dtls")}],
+        },
+        "iceParameters": {
+            "candidates": [{**candidate, "ip": ip, "type": "host"} for ip in (state.gateway_host, "::1")],
+            "icePwd": SERVER_ICE_PWD,
+            "iceUfrag": SERVER_ICE_UFRAG,
         },
         "rtpCapabilities": {
-            "send": {"audioCodecs": [], "audioExtensions": [], "videoCodecs": [], "videoExtensions": []},
-            "recv": {"audioCodecs": [], "audioExtensions": [], "videoCodecs": [], "videoExtensions": []},
             "sendrecv": {
                 "audioCodecs": [
                     {
-                        "payloadType": 111,
-                        "rtpMap": {"encodingName": "opus", "clockRate": 48000, "encodingParameters": 2},
-                        "rtcpFeedbacks": [{"type": "transport-cc"}],
                         "fmtp": {"parameters": {"minptime": "10", "useinbandfec": "1"}},
+                        "payloadType": 111,
+                        "rtcpFeedbacks": [{"type": "transport-cc"}, {"type": "rrtr"}, {"type": "nack"}],
+                        "rtpMap": {"clockRate": 48000, "encodingName": "opus", "encodingParameters": 2},
                     }
-                ],
-                "videoCodecs": [
-                    {
-                        "payloadType": 96,
-                        "rtpMap": {"encodingName": "VP8", "clockRate": 90000},
-                        "rtcpFeedbacks": _RTCP_FEEDBACKS,
-                        "fmtp": {"parameters": {}},
-                    },
-                    {
-                        "payloadType": 102,
-                        "rtpMap": {"encodingName": "H264", "clockRate": 90000},
-                        "rtcpFeedbacks": _RTCP_FEEDBACKS,
-                        "fmtp": {
-                            "parameters": {
-                                "level-asymmetry-allowed": "1",
-                                "packetization-mode": "1",
-                                "profile-level-id": "42e01f",
-                            }
-                        },
-                    },
-                    {
-                        "payloadType": 104,
-                        "rtpMap": {"encodingName": "H265", "clockRate": 90000},
-                        "rtcpFeedbacks": _RTCP_FEEDBACKS,
-                        "fmtp": {"parameters": {}},
-                    },
                 ],
                 "audioExtensions": [
                     {"entry": 1, "extensionName": "urn:ietf:params:rtp-hdrext:ssrc-audio-level"},
                     {"entry": 2, "extensionName": _EXT_ABS_SEND_TIME},
                     {"entry": 3, "extensionName": _EXT_TWCC},
-                    {"entry": 4, "extensionName": _EXT_MID},
+                ],
+                "videoCodecs": [
+                    _video_codec(
+                        49, "H265", {"level-id": "180", "profile-id": "1", "tier-flag": "0", "tx-mode": "SRST"}
+                    ),
+                    _video_codec(96, "VP8", {}),
+                    _video_codec(
+                        102,
+                        "H264",
+                        {"level-asymmetry-allowed": "1", "packetization-mode": "1", "profile-level-id": "42e01f"},
+                    ),
+                    _rtx(97, 96),
+                    _rtx(103, 102),
+                    _rtx(50, 49),
                 ],
                 "videoExtensions": [
                     {"entry": 2, "extensionName": _EXT_ABS_SEND_TIME},
-                    {"entry": 3, "extensionName": _EXT_TWCC},
-                    {"entry": 4, "extensionName": _EXT_MID},
                     {"entry": 13, "extensionName": "urn:3gpp:video-orientation"},
-                    {"entry": 14, "extensionName": "urn:ietf:params:rtp-hdrext:toffset"},
+                    {"entry": 3, "extensionName": _EXT_TWCC},
+                    {"entry": 5, "extensionName": "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay"},
+                    {"entry": 4, "extensionName": _EXT_MID},
+                    {"entry": 10, "extensionName": "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id"},
+                    {"entry": 11, "extensionName": "urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id"},
                 ],
             },
         },
@@ -162,7 +169,7 @@ class FakeGateway:
             "join_v3": self._join,
             "subscribe": self._subscribe,
             "unsubscribe": self._ack,
-            "ping": self._ack,
+            "ping": self._ping,
             "renew_token": self._renew_token,
             "set_client_role": self._ack,
             "leave": self._leave,
@@ -200,10 +207,13 @@ class FakeGateway:
 
     async def announce_peer(self, *, stream_first: bool = False) -> None:
         self.state.device_online = True
+        for frame in self._peer_frames(stream_first=stream_first):
+            await self.broadcast(frame)
+
+    def _peer_frames(self, *, stream_first: bool = False) -> tuple[JsonObject, JsonObject]:
         online = event("on_user_online", {"uid": self.state.device.uid})
         stream = event("on_add_video_stream", self.state.device.video_stream())
-        for frame in (stream, online) if stream_first else (online, stream):
-            await self.broadcast(frame)
+        return (stream, online) if stream_first else (online, stream)
 
     async def peer_leaves(self, reason: str = "quit") -> None:
         self.state.device_online = False
@@ -243,6 +253,11 @@ class FakeGateway:
     async def _ack(self, conn: GatewayConnection, frame: JsonObject) -> None:
         await self.send(conn, success(frame.get("_id")))
 
+    async def _ping(self, conn: GatewayConnection, frame: JsonObject) -> None:
+        # The captured reply carries no _message (gateway/real/ping_reply.json).
+        if self.state.answer_pings:
+            await self.send(conn, {"_id": frame.get("_id"), "_result": "success"})
+
     async def _join(self, conn: GatewayConnection, frame: JsonObject) -> None:
         message = frame.get("_message")
         if self.state.join_delay_s:
@@ -263,8 +278,12 @@ class FakeGateway:
             conn.joined = False
             conn.ws.transport.abort()
             return
-        if self.state.peer_online:
-            await self.announce_peer()
+        await self.send(conn, event("on_rtp_capability_change", dict(RTP_CAPABILITIES)))
+        # A publisher already in the channel is announced by events after the result, never inside it.
+        if self.state.device_online or self.state.peer_online:
+            self.state.device_online = True
+            for announcement in self._peer_frames():
+                await self.send(conn, announcement)
         self._arm_timers(conn)
 
     def _join_rejection(self, message: object) -> JoinRejection | None:
@@ -283,17 +302,15 @@ class FakeGateway:
         return None
 
     def _join_payload(self, uid: int) -> JsonObject:
-        payload: JsonObject = {
-            "uid": uid,
-            "cid": self.state.cid,
-            "vid": self.state.vid,
-            "cname": self.state.channel,
-            "rejoin_token": self.state.rejoin_token,
+        """The join result's ``_message``, keyed as captured: no ``cid``, ``cname`` or stream list."""
+        return {
+            "attributes": JOIN_ATTRIBUTES,
             "ortc": server_ortc(self.state),
+            "rejoin_token": self.state.rejoin_token,
+            "return_vosip": False,
+            "uid": uid,
+            "vid": self.state.vid,
         }
-        if self.state.device_online:
-            payload["streams"] = [self.state.device.video_stream()]
-        return payload
 
     def _arm_timers(self, conn: GatewayConnection) -> None:
         if (after := self.state.send_quit_after_s) is not None:
@@ -327,7 +344,7 @@ class FakeGateway:
         elif not self.state.device_online or message["stream_id"] != self.state.device.uid:
             await self.send(conn, failed(request_id, ERR_SUBSCRIBE_REQUEST_INVALID, "no such stream"))
         else:
-            await self.send(conn, success(request_id, {"stream_id": message["stream_id"]}))
+            await self.send(conn, success(request_id, {"p2pid": message.get("p2p_id", 1), "uid": conn.uid}))
 
     async def _renew_token(self, conn: GatewayConnection, frame: JsonObject) -> None:
         message = frame.get("_message")
@@ -353,7 +370,10 @@ def _ap_uid(message: JsonObject) -> int | None:
 
 
 def _quit_notification() -> JsonObject:
-    return event("on_notification", {"action": "quit", "code": ERR_REPEAT_JOIN_CHANNEL, "detail": "ERR_REPEAT_JOIN"})
+    return event(
+        "on_notification",
+        {"action": "quit", "code": ERR_REPEAT_JOIN_CHANNEL, "detail": "ERR_REPEAT_JOIN", "option": ""},
+    )
 
 
 def _p2p_lost() -> JsonObject:

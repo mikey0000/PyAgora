@@ -20,10 +20,13 @@ class APError(PyAgoraRTCError):
 
 
 class APRejectedError(APError):
-    """The access point answered, but every requested service came back with a non-zero code."""
+    """The access point answered, but every requested service came back with a non-zero code.
 
-    def __init__(self, codes: dict[int, int]) -> None:
-        super().__init__(f"access point rejected every service: {codes}")
+    ``reasons`` is appended to the message in parentheses: the codes' SDK names (``ap.describe_ap_code``).
+    """
+
+    def __init__(self, codes: dict[int, int], *, reasons: str = "") -> None:
+        super().__init__(f"access point rejected every service: {codes}" + (f" ({reasons})" if reasons else ""))
         self.codes = codes
 
 

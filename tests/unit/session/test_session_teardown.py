@@ -13,6 +13,7 @@ from tests.unit.session._helpers import (
     TIMEOUT,
     Recorder,
     all_done,
+    announced,
     reply,
     rig,
 )
@@ -50,7 +51,7 @@ class TestMessageLoopEnd:
     async def test_a_handler_that_raises_ends_the_session_as_socket_closed(self) -> None:
         """A handler exception killed the message loop and left the session joined, deaf to every later frame."""
         r = rig()
-        await r.join()
+        await r.join(extra=announced())
         await r.sent_type("subscribe")
         r.conn.send_error = RuntimeError("transport bug")
 

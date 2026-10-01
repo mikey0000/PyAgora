@@ -195,4 +195,5 @@ class TestEnums:
             "socket_closed",
             "deadline",
             "join_failed",
+            "ping_timeout",
         }

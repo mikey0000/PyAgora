@@ -22,8 +22,9 @@ This is the map. The rules are in `CONSTITUTION.md`; the reasons in
 │   session.py    AgoraSession: connect → join → answer SDP →   │
 │                 subscribe → keep alive → close                 │
 │   messages.py   pure builders/parsers for every gateway frame  │
-│   recovery.py   PeerRecovery, Keepalive and RenewDebounce      │
-│                 policies (pure; the runtime owns the loops)    │
+│   recovery.py   PeerRecovery, Keepalive, RenewDebounce and     │
+│                 PingWatchdog policies (pure; the runtime owns  │
+│                 the loops)                                     │
 │   transport.py  GatewayTransport protocol, websockets adapter, │
 │                 ssl_for(url)                                   │
 ├───────────────────────────────────────────────────────────────┤
@@ -93,6 +94,8 @@ host: s = AgoraSession(creds, ap, options, callbacks…)
 running: renew_token (debounced, token_provider or the last token sent),
          on_user_offline → cancel its subscribe tasks, one unsubscribe
            → PeerRecovery → host's on_peer_left,
+         ping and subscribe replies resolve by _id (D31); ten ping ticks
+           without a reply and 10 s without any frame → PING_TIMEOUT,
          on_notification quit / on_p2p_lost / ws closed (or the message
            loop stopping) / deadline → _end → on_closed(CloseReason) once
          state: is_connected, is_joined, remote_users, remote_streams
@@ -124,14 +127,17 @@ new `AgoraSession`. That is what keeps state simple enough to reason about.
 | How is a wire integer read? | `models.py::as_int` (AP response and gateway frames alike) |
 | How is a gateway frame logged? | `session/messages.py::describe_frame` (type, id, keys; never values); websockets' own frame log stays off (`session/transport.py`, D27) |
 | Which candidates reach a viewer via TURN? | `sdp/candidates.py::filter_candidates` |
-| Which TURN credential is used? | `ap/response.py::APResponse.get_ice_servers(strategy=)` over `models.TurnCredentialStrategy` |
+| Which TURN credential is used? | `ap/response.py::APResponse.get_ice_servers` (uid-derived, as the SDK; `DETAIL_FIRST` is deprecated, D32) |
 | How is the uid-derived password made? | `ap/password.py::derive_password` |
 | Which AP block is primary? | `ap/response.py::APResponse.from_api_response` (flag 4096 first; every scalar from the same block) |
+| What does an AP `code` mean? | `ap/response.py::AP_RESPONSE_CODE_NAMES` / `describe_ap_code` (the SDK's `PV` names; used only in `APRejectedError`'s message) |
 | Is this gateway frame something we handle? | `session/session.py::_HANDLERS` table |
 | When does a peer's absence trigger recovery? | `session/recovery.py::PeerRecovery` |
+| When is a silent gateway given up on? | `session/recovery.py::PingWatchdog` (D31), driven by `session/session.py::_ping_loop` |
 | When does the session end, and who is told? | `session/session.py::_end(reason)` → `on_closed` once |
 | Where do background tasks live? | `session/session.py::_spawn` (owned set; cancelled and awaited in `_end`, which `close` delegates to; refused once ended) |
 | How is a secret printed? | `models.py` `__repr__` redaction; `fingerprint()` for logs |
+| How is a live session turned into fixtures? | `capture.py` (`pyagorartc.capture` logger at DEBUG, redacted; D30) |
 | Which RTM endpoint is tried next? | `rtm/client.py::RtmRestClient._iter_endpoints` |
 
 ## 4. What is vendor policy, and how it plugs in
@@ -151,6 +157,7 @@ new `AgoraSession`. That is what keeps state simple enough to reason about.
 | Ending on `on_p2p_lost` | `end_on_p2p_lost` (default off, D22) | whether its device treats it as fatal |
 | Renewal cadence | `renew_debounce_s` (default 30 s, D8/Q11) | nothing, unless the gateway penalises repeats |
 | Timeouts | `join_timeout_s` (15 s), `connect_timeout_s` (10 s) | a slower network |
+| Which gateway edge | `gateway_edge_offset` (default 0: the AP's first; wraps) | the camera slot, when cameras share one viewer uid (D33) |
 | TLS on the gateway socket | `verify_ssl` (default on, D10) | a captive or proxied network |
 | RTM control vocabulary (PetKit `start_live`…) | `RtmRestClient.send_peer_message` | the payloads and their cadence |
 | Viewer transport (HA WebRTC, WHEP, go2rtc) | answer SDP, ICE servers, candidate helpers | the views, auth, relays |

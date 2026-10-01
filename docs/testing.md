@@ -102,7 +102,7 @@ server that speaks the recorded gateway protocol (join, subscribe, stream
 events, ping, renew, quit, p2p_lost) plus an aiohttp app serving the AP
 `choose_server`/`update_ticket` endpoints and the RTM `peer_messages`
 endpoint, with a `/control` route for fault injection (reject join, delay,
-drop socket, announce a peer, make the peer leave, expire the token). It is
+drop socket, stop answering pings, announce a peer, make the peer leave, expire the token). It is
 the executable form of `protocol.md`; when they disagree, fix the fake and
 record why in `open_questions.md`.
 

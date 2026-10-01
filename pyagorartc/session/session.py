@@ -10,11 +10,13 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import replace
+from functools import partial
 import logging
 import time
 from typing import TYPE_CHECKING
 
 from pyagorartc.ap.response import fingerprints_from_edge
+from pyagorartc.capture import capture
 from pyagorartc.const import (
     DECLARED_SSRC_TIMEOUT_S,
     EDGE_DOMAIN_SUFFIX,
@@ -50,7 +52,7 @@ from pyagorartc.session.messages import (
     parse_rtp_capability_change,
     parse_user_event,
 )
-from pyagorartc.session.recovery import Keepalive, PeerRecovery, RenewDebounce
+from pyagorartc.session.recovery import Keepalive, PeerRecovery, PingWatchdog, RenewDebounce
 from pyagorartc.session.transport import WebsocketsTransport
 
 if TYPE_CHECKING:
@@ -114,6 +116,7 @@ class AgoraSession:
         self._new_id = request_id_factory
         self._recovery = PeerRecovery(clock=clock)
         self._renew_debounce = RenewDebounce(window_s=options.renew_debounce_s, clock=clock)
+        self._ping = PingWatchdog(clock=clock)
 
         self._candidates: list[IceCandidate] = []
         self._tasks: set[asyncio.Task[None]] = set()
@@ -282,7 +285,7 @@ class AgoraSession:
         if self._reader_stopped:
             # The result arrived, but the message loop stopped before this task resumed to act on it.
             raise GatewayConnectError("gateway socket closed before the join completed")
-        _LOGGER.debug("Joined channel %s as uid %s (cid %s)", self._creds.channel_name, join.uid, join.cid)
+        _LOGGER.debug("Joined channel %s as uid %s (cid %s)", self._creds.channel_name, join.uid, self._ap.cid)
         await self._on_joined(join)
 
         remote_video = None
@@ -333,6 +336,8 @@ class AgoraSession:
     async def _connect(self) -> tuple[EdgeAddress, GatewayConnection]:
         if not (edges := self._ap.get_gateway_addresses()):
             raise GatewayConnectError("the access point returned no gateway edge")
+        if offset := self._options.gateway_edge_offset % len(edges):
+            edges = edges[offset:] + edges[:offset]
         for edge in edges:
             url = _edge_url(edge)
             try:
@@ -375,9 +380,11 @@ class AgoraSession:
                     text = await conn.recv()
                 except GatewayConnectError:
                     return
+                capture("gateway", "in", text)
                 if (frame := parse_frame(text)) is None:
                     _LOGGER.debug("Ignoring a gateway frame that is not a JSON object")
                     continue
+                self._ping.frame_received()
                 await self._dispatch(frame)
         finally:
             self._reader_stopped = True
@@ -390,6 +397,9 @@ class AgoraSession:
         if frame.id is not None:
             if (future := self._pending.pop(frame.id, None)) is not None and not future.done():
                 future.set_result(frame)
+            elif self._ping.reply(frame.id, ok=frame.ok):
+                if not frame.ok:
+                    _LOGGER.debug("Gateway answered a ping with result %s", frame.result)
             else:
                 _LOGGER.debug("Response matches no pending request (%s): %s", frame.result, describe_frame(frame))
             return
@@ -545,10 +555,8 @@ class AgoraSession:
             if attempt > 0 and self._subscriptions.get(key) is not asyncio.current_task():
                 return
             request_id = self._new_id()
-            ack: asyncio.Future[GatewayFrame] | None = None
-            if attempt < attempts:
-                ack = asyncio.get_running_loop().create_future()
-                self._pending[request_id] = ack
+            ack: asyncio.Future[GatewayFrame] = asyncio.get_running_loop().create_future()
+            self._pending[request_id] = ack
             try:
                 await self._send(
                     build_subscribe(stream, codec=self._options.client_codec, rtx=self._rtx, request_id=request_id)
@@ -561,7 +569,9 @@ class AgoraSession:
                 return
             if attempt == 0 and self._on_stream is not None:
                 await self._run_callback("on_stream", self._on_stream(stream))
-            if ack is None:
+            if attempt == attempts:
+                # D31: the last attempt's ack is tracked, not awaited; it stays pending until answered or the end.
+                ack.add_done_callback(partial(_report_subscribe_ack, stream.uid))
                 return
             await self._sleep(self._options.subscribe_retry_delay_s)
             self._pending.pop(request_id, None)
@@ -573,8 +583,19 @@ class AgoraSession:
     async def _ping_loop(self) -> None:
         while True:
             await self._sleep(PING_INTERVAL_S)
+            if self._ping.tick():
+                _LOGGER.warning(
+                    "Gateway on %s answered no ping for %s ticks and sent nothing for over %ss; ending the session",
+                    self._creds.channel_name,
+                    self._ping.unanswered,
+                    self._ping.silence_s,
+                )
+                await self._end(CloseReason.PING_TIMEOUT)
+                return
+            request_id = self._new_id()
+            self._ping.sent(request_id)
             try:
-                await self._send(build_ping(self._new_id()))
+                await self._send(build_ping(request_id))
             except GatewayConnectError:
                 _LOGGER.debug("Ping could not be sent; the message loop reports the closed socket")
                 return
@@ -634,6 +655,7 @@ class AgoraSession:
         if (conn := self._conn) is None:
             raise SessionClosedError("the session has no gateway socket")
         await conn.send(encode_frame(frame))
+        capture("gateway", "out", frame)
         _LOGGER.debug("Sent %s", describe_frame(frame))
 
     async def _send_bounded(self, frame: JsonObject) -> None:
@@ -674,6 +696,14 @@ class AgoraSession:
 
     def _wall_ms(self) -> int:
         return int(self._wall_clock() * 1000)
+
+
+def _report_subscribe_ack(uid: int, ack: asyncio.Future[GatewayFrame]) -> None:
+    # D31: a refused subscribe is logged; the SDK rejects only that request and keeps the session.
+    if ack.cancelled() or (frame := ack.result()).ok:
+        return
+    error = parse_error(frame)
+    _LOGGER.warning("Gateway refused the subscribe to uid %s (code %s, %s)", uid, error.code, error.message)
 
 
 def _edge_url(edge: EdgeAddress) -> str:

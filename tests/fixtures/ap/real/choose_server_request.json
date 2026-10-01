@@ -1,0 +1,25 @@
+{
+  "appid": "app-id-test",
+  "client_ts": 1790812070833,
+  "opid": 43238050022,
+  "sid": "47759297",
+  "request_bodies": [
+    {
+      "uri": 22,
+      "buffer": {
+        "cname": "channel-test",
+        "detail": {
+          "11": "CN,GLOBAL",
+          "17": "1",
+          "22": "CN,GLOBAL"
+        },
+        "key": "rtc-token-not-real",
+        "service_ids": [
+          11,
+          26
+        ],
+        "uid": 123456
+      }
+    }
+  ]
+}

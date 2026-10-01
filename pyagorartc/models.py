@@ -161,10 +161,14 @@ class TurnMode(IntEnum):
 
 
 class TurnCredentialStrategy(Enum):
-    """Where TURN username/credential come from (D12)."""
+    """Where TURN username/credential come from (D12, D32).
 
-    UID = "uid"  # username = str(uid), credential = derive_password(uid)
-    DETAIL_FIRST = "detail_first"  # AP detail 8/4 when present, else UID
+    ``DETAIL_FIRST`` is deprecated: it read AP detail 8 as the username, but detail 8 is the ``vid``. It now gives
+    the ``UID`` pair and warns; it stays importable until the next major version.
+    """
+
+    UID = "uid"  # username = str(uid), credential = derive_password(uid), as the SDK derives them
+    DETAIL_FIRST = "detail_first"
 
 
 class CloseReason(Enum):
@@ -176,6 +180,7 @@ class CloseReason(Enum):
     SOCKET_CLOSED = "socket_closed"
     DEADLINE = "deadline"
     JOIN_FAILED = "join_failed"
+    PING_TIMEOUT = "ping_timeout"
 
 
 @dataclass(frozen=True)
@@ -199,7 +204,8 @@ class SessionOptions:
     is off because the Mammotion integration deliberately ignored ``on_p2p_lost`` (D22);
     PetKit ends the session on it. ``subscribe_requires_online`` holds an announced stream until its
     publisher's ``on_user_online`` (Q18, D28); PetKit passes ``False``. ``prealloc_pc`` and
-    ``renew_debounce_s`` exist so a host can answer Q10 and Q11 without patching.
+    ``renew_debounce_s`` exist so a host can answer Q10 and Q11 without patching; ``gateway_edge_offset``
+    rotates the AP's edge list so two sessions can be put on different edges (Q20).
     """
 
     client_codec: str = DEFAULT_CLIENT_CODEC
@@ -218,6 +224,7 @@ class SessionOptions:
     renew_debounce_s: float = RENEW_TOKEN_DEBOUNCE_S
     join_timeout_s: float = JOIN_TIMEOUT_S
     connect_timeout_s: float = GATEWAY_CONNECT_TIMEOUT_S
+    gateway_edge_offset: int = 0
     verify_ssl: bool = True
     extra_join_attributes: Mapping[str, object] = field(default_factory=lambda: MappingProxyType({}), hash=False)
 

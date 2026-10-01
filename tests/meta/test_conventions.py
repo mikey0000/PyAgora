@@ -125,11 +125,12 @@ FORBIDDEN_EVERYWHERE = (
 LAYER_RULES: dict[str, tuple[str, ...]] = {
     "const": (),
     "exceptions": (),
+    "capture": (),
     "models": ("exceptions", "const"),
     "sdp": ("models", "exceptions", "const"),
-    "ap": ("models", "exceptions", "const"),
-    "rtm": ("models", "exceptions", "const"),
-    "session": ("sdp", "ap", "models", "exceptions", "const"),
+    "ap": ("models", "exceptions", "const", "capture"),
+    "rtm": ("models", "exceptions", "const", "capture"),
+    "session": ("sdp", "ap", "models", "exceptions", "const", "capture"),
 }
 # layers that may import no third-party package beyond these (sdp/ is pure: text and dicts, no I/O)
 THIRD_PARTY_ALLOWED: dict[str, tuple[str, ...]] = {"sdp": ("sdp_transform",)}

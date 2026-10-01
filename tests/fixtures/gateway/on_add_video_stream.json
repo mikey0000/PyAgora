@@ -1,13 +1,11 @@
 {
-  "_type": "on_add_video_stream",
   "_message": {
-    "uid": 1,
-    "uint_id": 1,
-    "video": true,
-    "ssrcId": 44444444,
-    "rtxSsrcId": 44444445,
     "cname": "o/i14u9pJrxRKAsu",
-    "codec": "H264",
-    "pt": 102
-  }
+    "pt": 102,
+    "rtxSsrcId": 44444445,
+    "ssrcId": 44444444,
+    "uid": 1,
+    "video": true
+  },
+  "_type": "on_add_video_stream"
 }

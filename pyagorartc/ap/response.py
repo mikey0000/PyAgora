@@ -9,7 +9,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 import logging
 import time
+from types import MappingProxyType
 from typing import TYPE_CHECKING
+import warnings
 
 from pyagorartc.ap.password import derive_password
 from pyagorartc.const import (
@@ -30,11 +32,34 @@ _LOGGER = logging.getLogger(__name__)
 
 _DETAIL_FINGERPRINTS = "19"
 _DEFAULT_FINGERPRINT_ALGORITHM = "sha-256"
-_DETAIL_TURN_USERNAME = "8"
-_DETAIL_TURN_CREDENTIAL = "4"
 _MISSING_CODE = -1
 
 type JsonObject = Mapping[str, object]
+
+#: Per-service AP ``code`` names. The SDK splits a code into service ``code // 10000`` and reason
+#: ``code % 10000`` (``Ux``, SDK:29449-29477); these are service 201 (UNILBS) and its ``PV`` reasons (SDK:28207-28225).
+AP_RESPONSE_CODE_NAMES: Mapping[int, str] = MappingProxyType(
+    {
+        2010005: "INVALID_VENDOR_KEY",
+        2010007: "INVALID_CHANNEL_NAME",
+        2010008: "INTERNAL_ERROR",
+        2010009: "NO_AUTHORIZED",
+        2010010: "DYNAMIC_KEY_TIMEOUT",
+        2010011: "NO_ACTIVE_STATUS",
+        2010013: "DYNAMIC_KEY_EXPIRED",
+        2010014: "STATIC_USE_DYNAMIC_KEY",
+        2010015: "DYNAMIC_USE_STATIC_KEY",
+        2010016: "USER_OVERLOAD",
+        2010018: "FORBIDDEN_REGION",
+        2010019: "CANNOT_MEET_AREA_DEMAND",
+        2010027: "REQ_DOWNGRADE_FALLBACK",
+    }
+)
+
+
+def describe_ap_code(code: int) -> str:
+    """``code`` followed by its SDK name when it has one (``2010009 NO_AUTHORIZED``), else the bare number."""
+    return f"{code} {name}" if (name := AP_RESPONSE_CODE_NAMES.get(code)) else str(code)
 
 
 def _as_object(value: object) -> JsonObject:
@@ -131,14 +156,13 @@ def _turn_urls(ip: str, mode: TurnMode) -> list[str]:
     return urls
 
 
-def _turn_credentials(block: APBlock, strategy: TurnCredentialStrategy, uid: int) -> tuple[str, str]:
-    username, credential = str(uid), derive_password(uid)
-    # Only the TURN block's detail 8/4 are credentials; the gateway block's detail 8 is its vid.
-    if strategy is TurnCredentialStrategy.DETAIL_FIRST and block.flag == AP_FLAG_TURN:
-        # Each key falls back on its own, as the PetKit copy shipped (D12).
-        username = str(block.detail.get(_DETAIL_TURN_USERNAME) or username)
-        credential = str(block.detail.get(_DETAIL_TURN_CREDENTIAL) or credential)
-    return username, credential
+def _warn_detail_first() -> None:
+    warnings.warn(
+        "TurnCredentialStrategy.DETAIL_FIRST is deprecated and gives the uid credentials: AP detail 8 is the vid, "
+        "not a TURN username (D32)",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 @dataclass(frozen=True, repr=False)
@@ -178,7 +202,10 @@ class APResponse:
                 continue
             blocks[block.flag] = block
         if not blocks:
-            raise APRejectedError(failed)
+            named = [
+                describe_ap_code(code) for code in dict.fromkeys(failed.values()) if code in AP_RESPONSE_CODE_NAMES
+            ]
+            raise APRejectedError(failed, reasons=", ".join(named))
         enter_ts = data.get("enter_ts")
         return cls(
             responses=blocks,
@@ -246,16 +273,19 @@ class APResponse:
         """ICE servers for a viewer: one entry per transport per TURN edge, one url each.
 
         UDP and TCP use ``turn:{ip}:3478``; TLS uses ``turns:{a-b-c-d}.edge.agora.io:443``. Without
-        TURN edges the primary edges are used, as both hosts shipped. Credentials follow ``strategy``
-        (D12), with AP detail 8/4 read only from the TURN block; ``uid`` replaces the block's uid for the
-        uid-derived pair.
+        TURN edges the primary edges are used, as both hosts shipped. The credentials are the SDK's:
+        ``str(uid)`` and ``derive_password(uid)``, with ``uid`` defaulting to the block's (D12).
+        ``TurnCredentialStrategy.DETAIL_FIRST`` gives the same pair and a ``DeprecationWarning`` (D32).
         """
         turn = self.responses.get(AP_FLAG_TURN)
         block = turn if turn is not None and turn.addresses else self.primary
         if block is not turn:
             _LOGGER.debug("no TURN edges in the AP response; using flag %s edges", block.flag)
         addresses = block.addresses if use_all_turn_servers else block.addresses[:1]
-        username, credential = _turn_credentials(block, strategy, block.uid if uid is None else uid)
+        if strategy is TurnCredentialStrategy.DETAIL_FIRST:
+            _warn_detail_first()
+        uid = block.uid if uid is None else uid
+        username, credential = str(uid), derive_password(uid)
         return [
             ICEServer(urls=[url], username=username, credential=credential)
             for address in addresses

@@ -16,6 +16,7 @@ from tests.integration._helpers import (
     ap_form,
     join_v3,
     recv_frame,
+    recv_join_followups,
     request,
     rtm_body,
     rtm_headers,
@@ -131,22 +132,36 @@ class TestJoinKnobs:
     async def test_peer_online_announces_the_device_right_after_the_join(
         self, fake_agora: FakeAgora, raw_ws: ClientConnection
     ) -> None:
-        fake_agora.control(peer_online=True)
+        fake_agora.control(device_online=False, peer_online=True)
         await send(raw_ws, join_v3())
 
-        types = [(await recv_frame(raw_ws)).get("_type") for _ in range(3)]
+        types = [(await recv_frame(raw_ws)).get("_type") for _ in range(4)]
 
-        assert types == [None, "on_user_online", "on_add_video_stream"]
+        assert types == [None, "on_rtp_capability_change", "on_user_online", "on_add_video_stream"]
 
     async def test_dtls_role_sets_the_role_in_the_join_ortc(
         self, fake_agora: FakeAgora, raw_ws: ClientConnection
     ) -> None:
-        fake_agora.control(dtls_role="client")
+        fake_agora.control(dtls_role="server")
         await send(raw_ws, join_v3())
 
         reply = await recv_frame(raw_ws)
 
-        assert reply["_message"]["ortc"]["dtlsParameters"]["role"] == "client"
+        assert reply["_message"]["ortc"]["dtlsParameters"]["role"] == "server"
+
+
+class TestRequestKnobs:
+    async def test_answer_pings_off_leaves_a_ping_unanswered_and_acks_everything_else(
+        self, fake_agora: FakeAgora, joined_ws: ClientConnection
+    ) -> None:
+        fake_agora.control(answer_pings=False)
+        await send(joined_ws, request("ping", request_id="f6a7b8"))
+        await send(joined_ws, request("unsubscribe", {"p2p_id": 1, "ortc": [], "stream_id": 1}, "c3d4e5"))
+
+        reply = await recv_frame(joined_ws)
+
+        assert reply["_id"] == "c3d4e5"
+        assert [f["_id"] for f in fake_agora.state.log.received_of_type("ping")] == ["f6a7b8"]
 
 
 class TestTimeDrivenKnobs:
@@ -159,6 +174,7 @@ class TestTimeDrivenKnobs:
         fake_agora.control(**{knob: 3.0})
         await send(raw_ws, join_v3())
         await recv_frame(raw_ws)
+        await recv_join_followups(raw_ws)
 
         await fake_agora.advance(2.9)
         early = fake_agora.state.log.sent_of_type(frame_type)

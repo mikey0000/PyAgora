@@ -253,6 +253,19 @@ class TestHostFallback:
 
         assert poster.urls == [_url(HOSTS[0])]
 
+    async def test_a_captured_rejection_raises_both_codes_and_tries_no_other_host(
+        self, credentials: ChannelCredentials
+    ) -> None:
+        """The AP refused a uid the token was not minted for (Q20 run 1); no edge comes back to dial."""
+        client, poster = make_ap_client((200, load_json_fixture("ap/real/choose_server_rejected_no_authorized.json")))
+
+        async with client:
+            with pytest.raises(APRejectedError) as excinfo:
+                await client.choose_server(credentials)
+
+        assert excinfo.value.codes == {4096: 2010009, 4194310: 2010009}
+        assert poster.urls == [_url(HOSTS[0])]
+
 
 class TestUpdateTicket:
     async def test_sends_uri_28_with_the_edges_and_the_gateway_service(self, credentials: ChannelCredentials) -> None:

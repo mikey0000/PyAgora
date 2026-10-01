@@ -21,7 +21,7 @@ OTHER_UID = DEVICE_UID + 1
 
 
 class TestSubscribe:
-    async def test_subscribes_to_a_stream_listed_in_the_join_with_the_option_codec_and_no_rtx(
+    async def test_subscribes_to_the_stream_announced_after_the_join_with_the_option_codec_and_rtx(
         self, new_session: Callable[..., SessionRig]
     ) -> None:
         r = new_session(SessionOptions(client_codec="h264"))
@@ -31,7 +31,7 @@ class TestSubscribe:
         (frame,) = await r.received("subscribe")
         message = frame["_message"]
         assert (message["stream_id"], message["ssrcId"], message["codec"]) == (DEVICE_UID, DEVICE_SSRC, "h264")
-        assert message["rtx"] is False  # the fake's ORTC lists no rtx codec, like the live gateway
+        assert message["rtx"] is True  # the fake's ORTC lists rtx codecs, as the captured gateway's does
 
     async def test_subscribes_once_a_device_joining_later_is_both_online_and_publishing(
         self, fake_agora: FakeAgora, new_session: Callable[..., SessionRig]

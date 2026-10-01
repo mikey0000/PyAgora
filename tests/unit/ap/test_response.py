@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from pyagorartc.ap.password import derive_password
-from pyagorartc.ap.response import APResponse, fingerprints_from_edge
+from pyagorartc.ap.response import APResponse, describe_ap_code, fingerprints_from_edge
 from pyagorartc.exceptions import APError, APRejectedError
 from pyagorartc.models import EdgeAddress, TurnCredentialStrategy, TurnMode
 from tests._helpers import RTC_TOKEN, load_json_fixture
@@ -99,6 +99,32 @@ class TestFailedBuffers:
             _parse("choose_server_all_failed.json")
 
         assert excinfo.value.codes == {GATEWAY: 2, TURN: 5}
+
+    def test_a_rejection_message_carries_no_name_for_codes_the_sdk_does_not_name(self) -> None:
+        with pytest.raises(APRejectedError) as excinfo:
+            _parse("choose_server_all_failed.json")
+
+        assert str(excinfo.value) == f"access point rejected every service: {{{GATEWAY}: 2, {TURN}: 5}}"
+
+    @pytest.mark.parametrize(
+        ("gateway_code", "turn_code", "reasons"),
+        [
+            (2010009, 2010005, "2010009 NO_AUTHORIZED, 2010005 INVALID_VENDOR_KEY"),
+            (2010009, 5, "2010009 NO_AUTHORIZED"),
+            (5, 2010013, "2010013 DYNAMIC_KEY_EXPIRED"),
+        ],
+    )
+    def test_a_rejection_message_names_each_distinct_named_code_once(
+        self, gateway_code: int, turn_code: int, reasons: str
+    ) -> None:
+        data = _response("choose_server_all_failed.json")
+        for item, code in zip(data["response_body"], (gateway_code, turn_code), strict=True):
+            item["buffer"]["code"] = code
+
+        with pytest.raises(APRejectedError) as excinfo:
+            APResponse.from_api_response(data)
+
+        assert str(excinfo.value).endswith(f"}} ({reasons})")
 
     def test_a_buffer_without_a_code_counts_as_failed(self) -> None:
         data = _response()
@@ -267,19 +293,6 @@ class TestGetIceServers:
 
         assert {(s.username, s.credential) for s in servers} == {("42", derive_password(42))}
 
-    def test_detail_first_uses_ap_detail_8_and_4(self) -> None:
-        servers = _parse().get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
-
-        assert {(s.username, s.credential) for s in servers} == {("TURN_USER_REDACTED", "TURN_CRED_REDACTED")}
-
-    def test_detail_first_falls_back_to_uid_credentials_per_missing_key(self) -> None:
-        data = _response()
-        del data["response_body"][1]["buffer"]["detail"]["4"]
-
-        servers = APResponse.from_api_response(data).get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
-
-        assert {(s.username, s.credential) for s in servers} == {("TURN_USER_REDACTED", UID_PASSWORD)}
-
     def test_without_a_turn_block_the_primary_edges_are_used(self) -> None:
         servers = _parse("choose_server_one_failed.json").get_ice_servers()
 
@@ -299,19 +312,22 @@ class TestGetIceServers:
         data = _response()
         data["response_body"][1]["buffer"]["edges_services"] = []
 
-        servers = APResponse.from_api_response(data).get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
+        with pytest.warns(DeprecationWarning, match="DETAIL_FIRST"):
+            servers = APResponse.from_api_response(data).get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
 
         assert {(s.username, s.credential) for s in servers} == {(str(FIXTURE_UID), UID_PASSWORD)}
 
-    def test_detail_first_with_a_uid_override_falls_back_to_that_uid(self) -> None:
-        data = _response()
-        del data["response_body"][1]["buffer"]["detail"]["8"]
+    def test_detail_first_is_deprecated_and_gives_the_uid_credentials(self) -> None:
+        with pytest.warns(DeprecationWarning, match="DETAIL_FIRST"):
+            servers = _parse().get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST)
 
-        servers = APResponse.from_api_response(data).get_ice_servers(
-            strategy=TurnCredentialStrategy.DETAIL_FIRST, uid=42
-        )
+        assert _shape(servers) == _shape(_parse().get_ice_servers(strategy=TurnCredentialStrategy.UID))
 
-        assert {(s.username, s.credential) for s in servers} == {("42", "TURN_CRED_REDACTED")}
+    def test_detail_first_honours_the_uid_override(self) -> None:
+        with pytest.warns(DeprecationWarning, match="DETAIL_FIRST"):
+            servers = _parse().get_ice_servers(strategy=TurnCredentialStrategy.DETAIL_FIRST, uid=42)
+
+        assert {(s.username, s.credential) for s in servers} == {("42", derive_password(42))}
 
     def test_is_empty_when_no_block_has_edges(self) -> None:
         data = _response("choose_server_one_failed.json")
@@ -371,7 +387,8 @@ class TestToApResponse:
             "uid": FIXTURE_UID,
             "cid": 123456789,
             "cname": "IOT_ID_REDACTED",
-            "detail": _response()["response_body"][0]["buffer"]["detail"],
+            # The top-level detail merged under the block's, as the captured join's ap_response shows it.
+            "detail": {"502": "192.0.2.2", **_response()["response_body"][0]["buffer"]["detail"]},
             "flag": GATEWAY,
             "opid": 999972753885,
             "cert": "TICKET_REDACTED",
@@ -425,3 +442,20 @@ class TestRedaction:
         APResponse.from_api_response(data)
 
         assert data == before
+
+
+class TestDescribeApCode:
+    @pytest.mark.parametrize(
+        ("code", "described"),
+        [
+            (2010009, "2010009 NO_AUTHORIZED"),
+            (2010027, "2010027 REQ_DOWNGRADE_FALLBACK"),
+        ],
+    )
+    def test_names_a_unilbs_reason_from_the_trailing_four_digits(self, code: int, described: str) -> None:
+        """The SDK splits the code as service ``code // 10000`` (201, UNILBS) and reason ``code % 10000``."""
+        assert describe_ap_code(code) == described
+
+    @pytest.mark.parametrize("code", [9, 1010009, 2010006, 0, -1])
+    def test_returns_the_bare_number_for_a_code_it_has_no_name_for(self, code: int) -> None:
+        assert describe_ap_code(code) == str(code)

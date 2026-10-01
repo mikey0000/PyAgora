@@ -67,7 +67,7 @@ _USER_ATTRIBUTES: Mapping[str, object] = {
     "enableDualStreamFlag": False,
 }
 
-# PetKit's markers for "this node in the join payload is a video stream" (the server's key is unverified).
+# PetKit's markers for "this node in the join payload is a video stream"; no captured join lists one (protocol.md §2.5).
 _VIDEO_CODEC_MARKERS = frozenset({"h264", "h265", "video"})
 # Deeper than any payload the SDK describes; bounds the walk on a hostile or broken frame.
 _MAX_STREAM_SEARCH_DEPTH = 32
@@ -161,7 +161,11 @@ class GatewayFrame:
 
 @dataclass(frozen=True, kw_only=True, repr=False)
 class JoinResult:
-    """What the session reads from a successful ``join_v3`` response (protocol.md §2.5)."""
+    """What the session reads from a successful ``join_v3`` response (protocol.md §2.5).
+
+    The captured Mammotion result carries neither ``cid`` nor ``cname`` (both ``None``; the AP block has the
+    cid) and lists no stream, so ``existing_streams`` is empty there.
+    """
 
     ortc: Mapping[str, object]
     rejoin_token: str | None
@@ -434,7 +438,8 @@ def existing_streams_from_join(message: Mapping[str, object]) -> list[RemoteStre
 
     PetKit's walk (``_find_existing_video_streams``): any object with an int ``uid`` and ``ssrcId``
     plus a video marker, at most 32 levels deep. Deduplicated by ``(uid, ssrc)`` in payload order. The
-    server's key is unverified.
+    captured Mammotion gateway lists none: it announces publishers already in the channel by event right after
+    the result (protocol.md §2.5).
     """
     found: dict[tuple[int, int], RemoteStream] = {}
     _collect_video_streams(message, found)
@@ -444,7 +449,8 @@ def existing_streams_from_join(message: Mapping[str, object]) -> list[RemoteStre
 def parse_remote_stream(message: Mapping[str, object]) -> RemoteStream | None:
     """An ``on_add_video_stream`` payload, or ``None`` without an int ``uid`` and ``ssrcId``.
 
-    The event type implies video, so no ``video`` flag is required (HA-Luba). ``codec`` is lower-cased.
+    The event type implies video, so no ``video`` flag is required (HA-Luba). ``codec`` is lower-cased; the
+    captured event carries none, only ``pt``.
     A ``pt`` of 0 is logged at WARNING: the gateway found no offered codec it can relay the stream as.
     """
     uid = as_int(message.get("uid"))

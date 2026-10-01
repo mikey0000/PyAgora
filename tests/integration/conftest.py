@@ -16,6 +16,7 @@ from tests.integration._helpers import (
     gateway_client,
     join_v3,
     recv_frame,
+    recv_join_followups,
     send,
     session_rig,
 )
@@ -50,10 +51,11 @@ async def raw_ws(fake_agora: FakeAgora) -> AsyncIterator[ClientConnection]:
 
 @pytest.fixture
 async def joined_ws(raw_ws: ClientConnection) -> ClientConnection:
-    """``raw_ws`` after a successful ``join_v3`` (its reply already consumed)."""
+    """``raw_ws`` after a successful ``join_v3``, its reply and the frames that follow it already consumed."""
     await send(raw_ws, join_v3())
     reply = await recv_frame(raw_ws)
     assert reply["_result"] == "success"
+    await recv_join_followups(raw_ws)
     return raw_ws
 
 

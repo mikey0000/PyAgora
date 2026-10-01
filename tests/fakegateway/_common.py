@@ -18,19 +18,18 @@ DEVICE_UID = 1
 DEVICE_SSRC = 44444444
 DEVICE_RTX_SSRC = 44444445
 DEVICE_CNAME = "fake-device-cname"
-DEVICE_CODEC = "h264"
 DEVICE_PAYLOAD_TYPE = 102
 CID = 123456789
 VID = 987654
 REJOIN_TOKEN = "rejoin-token-not-real"
 TICKET = "ticket-not-real"
-TURN_USERNAME = "turn-user-test"
 TURN_PASSWORD = "turn-pass-not-real"  # AP detail "4" (D12); obviously fake
 TURN_IPS: tuple[str, ...] = ("203.0.113.10", "203.0.113.11", "203.0.113.12")  # RFC 5737 TEST-NET-3
 TURN_PORT = 443
 MEDIA_PORT = 4707
 CANDIDATE_PRIORITY = 2103266323
-SERVER_ICE_UFRAG = "FkUf"
+# The gateway prefixes its ufrag with the channel id (captured 2026-10-01).
+SERVER_ICE_UFRAG = f"{CID}_fake-ice-ufrag"
 SERVER_ICE_PWD = "fake-server-ice-pwd-0000"  # 24 chars, like the real ones
 
 FLAG_GATEWAY = 4096
@@ -66,6 +65,11 @@ def dtls_fingerprint(seed: str) -> str:
     """A deterministic 32-byte, colon-separated sha-256 fingerprint."""
     digest = hashlib.sha256(seed.encode()).hexdigest().upper()
     return ":".join(digest[i : i + 2] for i in range(0, 64, 2))
+
+
+def edge_fingerprint(ip: str, port: int) -> str:
+    """The DTLS fingerprint of the fake edge at ``ip:port``: AP detail 19 and that edge's join ORTC carry the same one."""
+    return dtls_fingerprint(f"edge-{ip}:{port}")
 
 
 def success(request_id: object, message: JsonObject | None = None) -> JsonObject:

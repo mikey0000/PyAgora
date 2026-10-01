@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-from tests.integration._helpers import recv_frame, request, send, subscribe, upload
+from tests._helpers import load_json_fixture
+from tests.integration._helpers import AP_UID, recv_frame, request, send, subscribe, upload
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
@@ -16,12 +17,13 @@ if TYPE_CHECKING:
 
 
 class TestRequestAcks:
-    async def test_acks_a_subscribe_to_the_device_stream(self, joined_ws: ClientConnection) -> None:
+    async def test_acks_a_subscribe_with_the_captured_p2pid_and_viewer_uid(self, joined_ws: ClientConnection) -> None:
         await send(joined_ws, subscribe(1, "b2c3d4"))
 
         reply = await recv_frame(joined_ws)
 
-        assert reply == {"_id": "b2c3d4", "_result": "success", "_message": {"stream_id": 1}}
+        captured = load_json_fixture("gateway/real/subscribe_ack.json")
+        assert reply == captured | {"_id": "b2c3d4", "_message": {"p2pid": 1, "uid": AP_UID}}
 
     async def test_fails_a_subscribe_to_an_unknown_uid(self, joined_ws: ClientConnection) -> None:
         await send(joined_ws, subscribe(2))
@@ -68,12 +70,12 @@ class TestRequestAcks:
 
         assert (reply["_id"], reply["_result"]) == ("c3d4e5", "success")
 
-    async def test_answers_ping_with_a_correlated_empty_success(self, joined_ws: ClientConnection) -> None:
+    async def test_answers_ping_with_a_correlated_success_and_no_message(self, joined_ws: ClientConnection) -> None:
         await send(joined_ws, request("ping", request_id="f6a7b8"))
 
         reply = await recv_frame(joined_ws)
 
-        assert reply == {"_id": "f6a7b8", "_result": "success", "_message": {}}
+        assert reply == load_json_fixture("gateway/real/ping_reply.json") | {"_id": "f6a7b8"}
 
     async def test_does_not_answer_a_ping_back_upload(self, fake_agora: FakeAgora, joined_ws: ClientConnection) -> None:
         await send(joined_ws, upload("ping_back", {"pingpongElapse": 42}))
@@ -177,10 +179,7 @@ class TestServerEvents:
 
         frame = await recv_frame(joined_ws)
 
-        assert frame == {
-            "_type": "on_notification",
-            "_message": {"action": "quit", "code": 2003, "detail": "ERR_REPEAT_JOIN"},
-        }
+        assert frame == load_json_fixture("gateway/real/on_notification_quit_repeat_join.json")
 
     async def test_send_p2p_lost_puts_the_error_inside_the_message(
         self, fake_agora: FakeAgora, joined_ws: ClientConnection

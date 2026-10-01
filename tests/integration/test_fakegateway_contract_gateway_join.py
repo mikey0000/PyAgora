@@ -1,4 +1,4 @@
-"""The fake gateway answers ``join_v3`` as protocol.md §2 reconstructs it."""
+"""The fake gateway answers ``join_v3`` in the shape captured on 2026-10-01 (``fixtures/gateway/real/``)."""
 
 from __future__ import annotations
 
@@ -7,13 +7,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests._helpers import CREDENTIALS
+from tests._helpers import load_json_fixture
+from tests.fakegateway._common import CID, LOOPBACK, edge_fingerprint
 from tests.integration._helpers import (
     AP_UID,
     RECV_TIMEOUT_S,
     gateway_client,
     join_v3,
     recv_frame,
+    recv_join_followups,
     request,
     send,
     subscribe,
@@ -34,17 +36,30 @@ class TestJoinSuccess:
         assert (reply["_id"], reply["_result"]) == ("a1b2c3", "success")
         assert "_type" not in reply
 
-    async def test_carries_session_identity_and_rejoin_token(
+    async def test_carries_the_captured_keys_with_uid_vid_and_rejoin_token(
         self, fake_agora: FakeAgora, raw_ws: ClientConnection
     ) -> None:
         await send(raw_ws, join_v3())
 
         message = (await recv_frame(raw_ws))["_message"]
 
-        assert message["uid"] == AP_UID
-        assert (message["cid"], message["vid"]) == (fake_agora.state.cid, fake_agora.state.vid)
-        assert message["cname"] == CREDENTIALS.channel_name
+        assert sorted(message) == sorted(load_json_fixture("gateway/real/join_ok_luba2.json")["_message"])
+        assert (message["uid"], message["vid"]) == (AP_UID, fake_agora.state.vid)
         assert message["rejoin_token"] == "rejoin-token-not-real"
+
+    async def test_follows_the_result_with_capabilities_then_the_publishing_device(
+        self, fake_agora: FakeAgora, raw_ws: ClientConnection
+    ) -> None:
+        await send(raw_ws, join_v3())
+        await recv_frame(raw_ws)
+
+        capabilities, online, stream = await recv_join_followups(raw_ws)
+
+        assert capabilities == load_json_fixture("gateway/real/on_rtp_capability_change.json")
+        assert online["_message"] == {"uid": fake_agora.state.device.uid}
+        assert sorted(stream["_message"]) == sorted(
+            load_json_fixture("gateway/real/on_add_video_stream.json")["_message"]
+        )
 
     async def test_falls_back_to_the_viewer_uid_without_an_ap_response(
         self, fake_agora: FakeAgora, raw_ws: ClientConnection
@@ -57,77 +72,68 @@ class TestJoinSuccess:
 
         assert message["uid"] == fake_agora.state.viewer_uid
 
-    async def test_ortc_is_ice_lite_with_one_host_candidate(self, raw_ws: ClientConnection) -> None:
+    async def test_ortc_is_ice_lite_with_a_v4_and_a_v6_host_candidate(self, raw_ws: ClientConnection) -> None:
         await send(raw_ws, join_v3())
 
         ice = (await recv_frame(raw_ws))["_message"]["ortc"]["iceParameters"]
 
-        assert (ice["iceUfrag"], len(ice["icePwd"])) == ("FkUf", 24)
-        assert ice["candidates"] == [
-            {
-                "foundation": "udpcandidate",
-                "ip": "127.0.0.1",
-                "port": 4707,
-                "priority": 2103266323,
-                "protocol": "udp",
-                "type": "host",
-            }
+        assert (ice["iceUfrag"].split("_")[0], len(ice["icePwd"])) == (str(CID), 24)
+        assert [(c["ip"], c["port"], c["type"]) for c in ice["candidates"]] == [
+            (LOOPBACK, 4707, "host"),
+            ("::1", 4707, "host"),
         ]
 
-    async def test_ortc_declares_the_dtls_role_server_with_a_full_fingerprint(self, raw_ws: ClientConnection) -> None:
+    async def test_ortc_takes_the_client_role_with_the_connected_edges_fingerprint(
+        self, fake_agora: FakeAgora, raw_ws: ClientConnection
+    ) -> None:
         await send(raw_ws, join_v3())
 
         dtls = (await recv_frame(raw_ws))["_message"]["ortc"]["dtlsParameters"]
 
-        assert dtls["role"] == "server"
-        assert dtls["fingerprints"][0]["algorithm"] == "sha-256"
-        assert len(dtls["fingerprints"][0]["fingerprint"].split(":")) == 32
+        edge = fake_agora.state.gateway_edges[0]
+        assert dtls == {
+            "fingerprints": [{"algorithm": "sha-256", "fingerprint": edge_fingerprint(edge.ip, edge.port)}],
+            "role": "client",
+        }
 
-    async def test_ortc_lists_vp8_h264_h265_and_opus_without_rtx(self, raw_ws: ClientConnection) -> None:
+    async def test_ortc_has_one_sendrecv_bucket_with_rtx_for_every_video_codec(self, raw_ws: ClientConnection) -> None:
         await send(raw_ws, join_v3())
 
-        caps = (await recv_frame(raw_ws))["_message"]["ortc"]["rtpCapabilities"]["sendrecv"]
+        caps = (await recv_frame(raw_ws))["_message"]["ortc"]["rtpCapabilities"]
 
-        assert [c["rtpMap"]["encodingName"] for c in caps["videoCodecs"]] == ["VP8", "H264", "H265"]
-        assert [c["rtpMap"]["encodingName"] for c in caps["audioCodecs"]] == ["opus"]
-        assert all({"type": "nack", "parameter": "pli"} in c["rtcpFeedbacks"] for c in caps["videoCodecs"])
+        video = caps["sendrecv"]["videoCodecs"]
+        media = {c["payloadType"] for c in video if c["rtpMap"]["encodingName"] != "rtx"}
+        assert list(caps) == ["sendrecv"]
+        assert {int(c["fmtp"]["parameters"]["apt"]) for c in video if c["rtpMap"]["encodingName"] == "rtx"} == media
+        assert [c["rtpMap"]["encodingName"] for c in caps["sendrecv"]["audioCodecs"]] == ["opus"]
 
-    async def test_ortc_lists_the_mid_extension(self, raw_ws: ClientConnection) -> None:
+    async def test_ortc_lists_the_mid_extension_for_video_only(self, raw_ws: ClientConnection) -> None:
         await send(raw_ws, join_v3())
 
         caps = (await recv_frame(raw_ws))["_message"]["ortc"]["rtpCapabilities"]["sendrecv"]
 
         mid = "urn:ietf:params:rtp-hdrext:sdes:mid"
         assert mid in [e["extensionName"] for e in caps["videoExtensions"]]
-        assert mid in [e["extensionName"] for e in caps["audioExtensions"]]
+        assert mid not in [e["extensionName"] for e in caps["audioExtensions"]]
 
-    async def test_lists_the_online_device_stream(self, raw_ws: ClientConnection) -> None:
-        await send(raw_ws, join_v3())
-
-        streams = (await recv_frame(raw_ws))["_message"]["streams"]
-
-        assert streams == [
-            {
-                "uid": 1,
-                "uint_id": 1,
-                "video": True,
-                "ssrcId": 44444444,
-                "rtxSsrcId": 44444445,
-                "cname": "fake-device-cname",
-                "codec": "h264",
-                "pt": 102,
-            }
-        ]
-
-    async def test_lists_no_streams_while_the_device_is_offline(
-        self, fake_agora: FakeAgora, raw_ws: ClientConnection
-    ) -> None:
-        fake_agora.control(device_online=False)
+    async def test_lists_no_streams_in_the_result(self, raw_ws: ClientConnection) -> None:
         await send(raw_ws, join_v3())
 
         message = (await recv_frame(raw_ws))["_message"]
 
         assert "streams" not in message
+
+    async def test_announces_nothing_after_the_result_while_the_device_is_offline(
+        self, fake_agora: FakeAgora, raw_ws: ClientConnection
+    ) -> None:
+        fake_agora.control(device_online=False)
+        await send(raw_ws, join_v3())
+        await recv_frame(raw_ws)
+
+        await recv_join_followups(raw_ws, announced=False)
+        await send(raw_ws, request("ping", request_id="f6a7b8"))
+
+        assert (await recv_frame(raw_ws))["_id"] == "f6a7b8"
 
     async def test_records_the_join_as_received(self, fake_agora: FakeAgora, raw_ws: ClientConnection) -> None:
         await send(raw_ws, join_v3())
@@ -189,8 +195,7 @@ class TestRepeatJoin:
             quit_frame = await recv_frame(joined_ws)
             second_reply = await recv_frame(second)
 
-        assert quit_frame["_type"] == "on_notification"
-        assert (quit_frame["_message"]["action"], quit_frame["_message"]["code"]) == ("quit", 2003)
+        assert quit_frame == load_json_fixture("gateway/real/on_notification_quit_repeat_join.json")
         assert second_reply["_result"] == "success"
 
     async def test_a_join_on_another_uid_leaves_the_first_alone(
@@ -199,8 +204,9 @@ class TestRepeatJoin:
         async with gateway_client(fake_agora.gateway_url) as second:
             await send(second, join_v3(ap_uid=AP_UID + 1))
             await recv_frame(second)
+            await recv_join_followups(second)
 
-        assert [r.connection for r in fake_agora.state.log.gateway_sent] == [0, 1]
+        assert fake_agora.state.log.sent_of_type("on_notification") == []
 
 
 class TestJoinDelay:

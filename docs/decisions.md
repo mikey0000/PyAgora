@@ -268,3 +268,66 @@ before the result fails the join at once instead of waiting out the
 timeout. `GatewayConnectError`, not `JoinRejectedError`: the join result was
 a success, and `JoinRejectedError` carries a join-result code the gateway
 never sent; this is the same shape as the socket-close race.
+
+## D30. Wire capture is an opt-in logger, redacted, off by default
+
+`pyagorartc.capture` logs every gateway frame (both directions), every
+access-point exchange and every RTM exchange as one compact JSON line, with
+credential-bearing values (`channel_key`, tokens, `cert`/`ticket`, `icePwd`,
+`aes_*`, AP detail `4` (TURN password) and `10` (an AccessToken2-shaped value
+the first capture leaked), app ids, `license`) replaced by `<redacted>`. The logger is silent unless a host enables it at DEBUG.
+Reason: `docs/protocol.md`'s server frames were reconstructions; one debug
+session with this logger on turns them into fixtures without writing a
+secret to disk. The wire logger of D27 stays pinned because `websockets`
+truncates frames and does not redact.
+
+## D31. Ping and subscribe replies are tracked; a dead gateway ends the session with `PING_TIMEOUT`
+
+Every `ping` and every `subscribe` is registered by `_id` before it is sent, so their replies resolve
+silently; only a response matching nothing is logged as a stray (DEBUG). The pong timeout copies the SDK's
+`handlePingPong` (`agoraRTC_N-4.24.3.js:31200-31226`, constants `:15124-15125`): each 3 s tick counts one more
+ping without a successful reply, a `success` reply resets the count (a `failed` one does not: the SDK's
+request rejects and the catch ignores it), and on the tick where the count reaches `PING_PONG_TIME_OUT`
+(10, so nine pings unanswered, 30 s after the last answered one) the session gives up only if no frame of
+any kind has arrived for over `WEBSOCKET_TIMEOUT_MIN` (10 s, the SDK's `lastMsgTime`); otherwise it pings
+again. Where the SDK then reconnects, the library ends the session with `CloseReason.PING_TIMEOUT` through
+`_end`, so `on_closed` fires once and recovery stays the host's (D14). The policy is
+`session/recovery.py::PingWatchdog`, on the injected clock.
+
+A refused subscribe (`_result: failed`) is logged at WARNING with its code and the session stays joined.
+The SDK rejects only that request's promise (`:30888-30897`) and gives `ERR_SUBSCRIBE_REQUEST_INVALID`
+(2021) and `ERR_TOO_MANY_SUBSCRIBERS` (2032) the `failed` action, not `quit` or `close`
+(protocol.md §5.4). HA-Luba logged a non-success response at INFO and carried on
+(`agora_websocket.py:418-440` on its `main`), and PetKit re-sent the subscribe a configured number of times,
+which `subscribe_retry_attempts` still does. The last attempt's ack is tracked rather than awaited, so no
+timer is armed for it; an unanswered one stays pending until the session ends.
+
+## D32. `TurnCredentialStrategy.DETAIL_FIRST` gives the uid credentials and is deprecated (amends D12)
+
+The 2026-10-01 capture showed the TURN block's detail `8` is the `vid`, the same value as the gateway
+block's, in all eight AP responses, so `DETAIL_FIRST` sent the vid as the TURN username: a likely cause of
+the 401s that made HA-Luba drop it. The SDK never reads a detail key for TURN credentials. It reads detail
+`8` only as `vid` (`agoraRTC_N-4.24.3.js:43455`, `:43631`) and gives every AP TURN edge username
+`str(uid)` and password `sha256(str(uid))` in lowercase hex (`t2`, `:43743-43758`; `cO`, `:12453-12462`),
+under `ENCRYPT_PROXY_USERNAME_AND_PSW`, default on (`:15191`) and taken in a secure context, else
+`test`/`111111` (`:14923-14941`). The connected gateway as a TURN server on port + 30 uses the uid and the
+channel token (`:46096-46139`), and P2P mode prefixes the uid with `glb:` (`:49183-49194`). `UID` already
+matches the SDK. The member stays importable, so v0.2.x hosts that pass it keep working: it now gives the
+`UID` pair and emits a `DeprecationWarning` (once per call site, as Python shows it). It is removed at the
+next major version. Detail `4` is non-empty in both blocks, an opaque token-shaped value the SDK does not
+read; nothing in the library reads it. Neither known host needs to change: HA-Luba passes no strategy, and
+the PetKit guide no longer asks for `DETAIL_FIRST`. Closes Q5.
+
+## D33. Two viewers with one uid may coexist on distinct gateway edges; `gateway_edge_offset` is the host's lever
+
+The 2003 `ERR_REPEAT_JOIN` eviction is per gateway edge (Q20). Two viewers with one uid on one edge: the older
+is quit 340 ms after the newer `join_v3`. On two edges, joined 17 s apart: both stay joined with no quit
+(`sessions/luba2_two_edges.json`). A made-up uid is refused by the AP: the Mammotion token with its uid + 1
+gets `2010009` for both services (UNILBS `NO_AUTHORIZED`, "invalid token, authorized failed"), with no edges and
+an empty `cert` (`ap/real/choose_server_rejected_no_authorized.json`). So per-camera edge placement is the only
+way to run two cameras on one Mammotion token. The host passes `SessionOptions.gateway_edge_offset` = the
+camera slot (migration §2.4.1). The library does not choose for it, because it does not know which sessions
+share a uid. The offset indexes each session's own AP answer and wraps, so it cannot rule out a collision when
+the answers list edges in different orders or there are fewer edges than cameras (backlog). An AP rejection
+now names its code from the SDK's `PV` table (`ap.describe_ap_code`) in `APRejectedError`'s message;
+`codes` is unchanged.

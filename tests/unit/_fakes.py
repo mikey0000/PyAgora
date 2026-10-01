@@ -114,7 +114,8 @@ class FakeGatewayConnection:
     instead, once. While ``send_gate`` is an unset event, every send waits on it
     (``wait_for_held_sends(n)`` resolves once ``n`` are waiting). ``close()`` from the test
     side makes ``recv`` raise ``GatewayConnectError`` once the queue drains, like a peer
-    closing the socket.
+    closing the socket. ``wait_until_read()`` resolves once every fed frame has been handled:
+    nothing is queued and the reader is back in ``recv`` or has stopped on the close.
     """
 
     def __init__(self) -> None:
@@ -128,9 +129,23 @@ class FakeGatewayConnection:
         self._held_event = asyncio.Event()
         self._incoming: asyncio.Queue[str | None] = asyncio.Queue()
         self._sent_event = asyncio.Event()
+        self._reader_waiting = False
+        self._reader_done = False
+        self._read_progress = asyncio.Event()
 
     def feed(self, frame: dict[str, Any] | str) -> None:
         self._incoming.put_nowait(frame if isinstance(frame, str) else json.dumps(frame))
+
+    async def wait_until_read(self) -> None:
+        """Resolve once nothing is queued and the reader waits in ``recv`` or has stopped, so every frame was dispatched."""
+        while not (self._incoming.empty() and (self._reader_waiting or self._reader_done)):
+            self._read_progress.clear()
+            await self._read_progress.wait()
+
+    def _reader_stopped(self) -> GatewayConnectError:
+        self._reader_done = True
+        self._read_progress.set()
+        return GatewayConnectError("socket closed by peer")
 
     async def wait_for_sent(self, n: int) -> None:
         """Resolve once ``n`` frames have been sent."""
@@ -169,10 +184,15 @@ class FakeGatewayConnection:
 
     async def recv(self) -> str:
         if self.closed and self._incoming.empty():
-            raise GatewayConnectError("socket closed by peer")
-        frame = await self._incoming.get()
+            raise self._reader_stopped()
+        self._reader_waiting = True
+        self._read_progress.set()
+        try:
+            frame = await self._incoming.get()
+        finally:
+            self._reader_waiting = False
         if frame is None:
-            raise GatewayConnectError("socket closed by peer")
+            raise self._reader_stopped()
         return frame
 
     async def close(self) -> None:

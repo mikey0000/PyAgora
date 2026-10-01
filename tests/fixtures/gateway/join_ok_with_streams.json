@@ -1,0 +1,116 @@
+{
+  "_id": "a1b2c3",
+  "_result": "success",
+  "_message": {
+    "uid": 123456,
+    "cid": 123456789,
+    "vid": 987654,
+    "cname": "channel-test",
+    "rejoin_token": "rejoin-token-not-real",
+    "ortc": {
+      "cname": "o/i14u9pJrxRKAsu",
+      "iceParameters": {
+        "iceUfrag": "KdDV",
+        "icePwd": "ice-pwd-gateway-test-001",
+        "candidates": [
+          {
+            "foundation": "udpcandidate",
+            "ip": "192.0.2.13",
+            "port": 4707,
+            "priority": 2103266323,
+            "protocol": "udp",
+            "type": "host"
+          }
+        ]
+      },
+      "dtlsParameters": {
+        "role": "client",
+        "fingerprints": [
+          {
+            "algorithm": "sha-256",
+            "fingerprint": "BD:3E:08"
+          }
+        ]
+      },
+      "rtpCapabilities": {
+        "sendrecv": {
+          "audioCodecs": [
+            {
+              "payloadType": 111,
+              "rtpMap": {
+                "encodingName": "opus",
+                "clockRate": 48000,
+                "encodingParameters": 2
+              }
+            }
+          ],
+          "videoCodecs": [
+            {
+              "payloadType": 96,
+              "rtpMap": {
+                "encodingName": "VP8",
+                "clockRate": 90000
+              },
+              "rtcpFeedbacks": [
+                {
+                  "type": "nack"
+                },
+                {
+                  "type": "nack",
+                  "parameter": "pli"
+                },
+                {
+                  "type": "transport-cc"
+                }
+              ]
+            },
+            {
+              "payloadType": 102,
+              "rtpMap": {
+                "encodingName": "H264",
+                "clockRate": 90000
+              },
+              "fmtp": {
+                "parameters": {
+                  "level-asymmetry-allowed": "1",
+                  "packetization-mode": "1",
+                  "profile-level-id": "42e01f"
+                }
+              }
+            }
+          ],
+          "audioExtensions": [
+            {
+              "entry": 1,
+              "extensionName": "urn:ietf:params:rtp-hdrext:ssrc-audio-level"
+            }
+          ],
+          "videoExtensions": [
+            {
+              "entry": 3,
+              "extensionName": "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"
+            }
+          ]
+        }
+      }
+    },
+    "streams": [
+      {
+        "uid": 1,
+        "uint_id": 1,
+        "video": true,
+        "ssrcId": 44444444,
+        "rtxSsrcId": 44444445,
+        "cname": "o/i14u9pJrxRKAsu",
+        "codec": "h264",
+        "pt": 102
+      },
+      {
+        "uid": 1,
+        "uint_id": 1,
+        "audio": true,
+        "ssrcId": 55555555
+      }
+    ]
+  }
+}

@@ -122,14 +122,19 @@ def event(name: str, **message: object) -> dict[str, Any]:
     return frame
 
 
+def announced(uid: int = PUBLISHER) -> tuple[dict[str, Any], dict[str, Any]]:
+    """What the gateway sends after the join result for a publisher already in the channel, in the captured order."""
+    return event("on_user_online", uid=uid), event("on_add_video_stream", uid=uid)
+
+
 def reply(name: str, to: dict[str, Any]) -> dict[str, Any]:
     """The ``gateway/<name>.json`` response fixture answering the sent frame ``to``."""
     return {**load_json_fixture(f"gateway/{name}.json"), "_id": to["_id"]}
 
 
 def subscribe_ack(to: dict[str, Any], *, ok: bool) -> dict[str, Any]:
-    """The gateway's answer to the sent ``subscribe`` ``to``: the generic success or failure response shape."""
-    return reply("ping_back" if ok else "join_failed", to)
+    """The gateway's answer to the sent ``subscribe`` ``to``: the captured ack, or the SDK's failure shape."""
+    return reply("subscribe_ack" if ok else "join_failed", to)
 
 
 def join_ok_with_role(role: str) -> dict[str, Any]:

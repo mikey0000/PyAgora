@@ -8,9 +8,10 @@ from aiohttp import web
 
 from tests.fakegateway._common import (
     FLAG_GATEWAY,
+    LOOPBACK,
     SERVICE_BLOCKS,
     decode,
-    dtls_fingerprint,
+    edge_fingerprint,
     host_index,
     now_ms,
 )
@@ -110,7 +111,15 @@ def build_response(state: FakeAgoraState, envelope: JsonObject) -> JsonObject:
         for name in state.envelope_flag_order
         if name in {SERVICE_BLOCKS[s][0] for s in body["buffer"]["service_ids"]}
     ]
-    return {"enter_ts": now_ms(state.clock), "opid": envelope["opid"], "detail": {}, "response_body": blocks}
+    # Captured top level (ap/real/choose_server_response.json): detail 502 (csIp) and the caller's wan_ip.
+    return {
+        "detail": {"502": LOOPBACK},
+        "enter_ts": now_ms(state.clock),
+        "leave_ts": now_ms(state.clock),
+        "opid": envelope["opid"],
+        "response_body": blocks,
+        "wan_ip": LOOPBACK,
+    }
 
 
 def _block(state: FakeAgoraState, name: str, buffer: JsonObject) -> JsonObject:
@@ -134,21 +143,28 @@ def _block(state: FakeAgoraState, name: str, buffer: JsonObject) -> JsonObject:
         "code": state.ap_turn_code,
         "flag": SERVICE_BLOCKS[26][1],
         **common,
-        "detail": {"8": state.turn_username, "4": state.turn_password} if ok else {},
+        "detail": _common_detail(state) if ok else {},
         "edges_services": _edges(state.turn_edges) if ok else [],
     }
 
 
-def _gateway_detail(state: FakeAgoraState, edges: tuple[Edge, ...]) -> JsonObject:
-    first = edges[0]
+def _common_detail(state: FakeAgoraState) -> JsonObject:
+    """The detail keys both captured blocks carry; ``8`` is the vid in both, ``10`` an unread token-shaped value."""
     return {
-        "1": first.ip,
+        "1": LOOPBACK,
+        "10": "",
+        "2": "NA",
+        "23": "",
+        "3": "XX",
+        "4": state.turn_password,
         "8": str(state.vid),
-        "19": ";".join(f"sha-256 {dtls_fingerprint(f'edge-{e.ip}:{e.port}')}" for e in edges),
-        "23": "GLOBAL",
-        "502": first.ip,
-        "candidate": f"{first.ip}:{first.port}",
+        "9": "",
     }
+
+
+def _gateway_detail(state: FakeAgoraState, edges: tuple[Edge, ...]) -> JsonObject:
+    """``_common_detail`` plus 19: one bare fingerprint per edge, each followed by ``;``, as captured."""
+    return _common_detail(state) | {"19": "".join(f"{edge_fingerprint(e.ip, e.port)};" for e in edges)}
 
 
 def _edges(edges: tuple[Edge, ...]) -> list[JsonObject]:
